@@ -2,88 +2,107 @@ open! Core
 open Kyc_core
 
 let at = Time_ns.of_string_with_utc_offset "2026-10-13 09:30:00Z"
-let operator = Actor.Operator (Operator_id.of_string "op-1")
+let a = Actor.Operator (Operator_id.of_string "op-a")
+let b = Actor.Operator (Operator_id.of_string "op-b")
 
-let hit : Screening.Hit.t =
-  { list_kind = Pep
-  ; list_name = "pep-list"
-  ; entry_ref = "entry-42"
+let hit source entry_id : Screening.Hit.t =
+  { source
+  ; list_version = "2026-10-13"
+  ; entry_id
   ; matched_name = "A. Example"
-  ; score = 81
+  ; score = 91
+  ; algorithm = "jaro-winkler-1"
   }
 ;;
 
-let run outcome =
-  Screening.create ~id:(Screening_id.of_string "scr-1") ~screened_at:at ~outcome
+let run hits =
+  Or_error.ok_exn
+    (Screening.create
+       ~id:(Screening_id.of_string "scr-1")
+       ~reason:Onboarding
+       ~screened_at:at
+       ~hits)
 ;;
 
-let show r = print_s [%sexp (r : Screening.t Or_error.t)]
-
-let%expect_test "a clear run needs no review" =
-  let clear = run Clear in
-  print_s [%sexp (clear : Screening.t)];
-  print_s [%sexp (Screening.blocks_approval clear : bool)];
-  show (Screening.review clear ~decision:(False_positive "n/a") ~actor:operator);
-  [%expect
-    {|
-    ((id scr-1) (screened_at "2026-10-13 09:30:00Z") (outcome Clear)
-     (decision Not_required) (reviewed_by ()))
-    false
-    (Error
-     ("screening is not awaiting review" (screening scr-1)
-      (current Not_required)))
-    |}]
+let review s entry_id action actor =
+  match Screening.review s ~entry_id ~action ~actor with
+  | Ok (s, state) ->
+    print_s [%sexp (state : Screening.Hit_state.t)];
+    s
+  | Error e ->
+    print_s [%sexp (e : Error.t)];
+    s
 ;;
 
-let%expect_test "hits wait for an operator" =
-  let hits = run (Hits [ hit ]) in
-  print_s [%sexp (Screening.blocks_approval hits : bool)];
-  show
-    (Screening.review
-       hits
-       ~decision:(False_positive "different date of birth")
-       ~actor:System);
-  show (Screening.review hits ~decision:Pending_review ~actor:operator);
-  let cleared =
-    Screening.review
-      hits
-      ~decision:(False_positive "different date of birth")
-      ~actor:operator
-  in
-  show cleared;
-  print_s [%sexp (Screening.blocks_approval (Or_error.ok_exn cleared) : bool)];
-  show
-    (Screening.review (Or_error.ok_exn cleared) ~decision:(True_match "") ~actor:operator);
-  let confirmed =
-    Screening.review hits ~decision:(True_match "same person") ~actor:operator
-  in
-  print_s [%sexp (Screening.blocks_approval (Or_error.ok_exn confirmed) : bool)];
+let%expect_test "discounting needs two operators" =
+  let s = run [ hit Eu_fsf "eu-1" ] in
+  print_s [%sexp (Screening.blocks_approval s : bool)];
+  let s = review s "eu-1" Take System in
+  let s = review s "eu-1" Take a in
+  let s = review s "eu-1" (Propose_discount "date of birth differs") a in
+  let s = review s "eu-1" Confirm_discount a in
+  let s = review s "eu-1" Confirm_discount b in
+  print_s [%sexp (Screening.blocks_approval s : bool)];
+  let _ = review s "eu-1" (Confirm "x") b in
   [%expect
     {|
     true
-    (Error ("only an operator may review a screening" (actor System)))
-    (Error ("a review must decide the hits" (decision Pending_review)))
-    (Ok
-     ((id scr-1) (screened_at "2026-10-13 09:30:00Z")
-      (outcome
-       (Hits
-        (((list_kind Pep) (list_name pep-list) (entry_ref entry-42)
-          (matched_name "A. Example") (score 81)))))
-      (decision (False_positive "different date of birth")) (reviewed_by (op-1))))
+    ("only an operator may review a hit" (actor System))
+    (Under_review (by op-a) (discount_proposal ()))
+    (Under_review (by op-a) (discount_proposal ("date of birth differs")))
+    ("discounting needs a second operator" (proposed_by op-a))
+    (Discounted (reason "date of birth differs") (proposed_by op-a)
+     (confirmed_by op-b))
     false
-    (Error
-     ("screening is not awaiting review" (screening scr-1)
-      (current (False_positive "different date of birth"))))
-    true
+    ("illegal hit review"
+     (state
+      (Discounted (reason "date of birth differs") (proposed_by op-a)
+       (confirmed_by op-b)))
+     (action (Confirm x)))
     |}]
+;;
+
+let%expect_test "escalate and confirm" =
+  let s = run [ hit Pep_list "pep-1"; hit Adverse_media "am-1" ] in
+  let s = review s "pep-1" (Escalate "senior review: same employer") a in
+  let s = review s "pep-1" (Escalate "again") b in
+  let s = review s "pep-1" (Confirm "same person") b in
+  let s = review s "nope" Take a in
+  print_s [%sexp (Screening.confirmed s : Screening.Hit.t list)];
+  print_s [%sexp (List.map (Screening.pending s) ~f:(fun h -> h.entry_id) : string list)];
+  [%expect
+    {|
+    (Escalated (by op-a) (reason "senior review: same employer"))
+    ("illegal hit review"
+     (state (Escalated (by op-a) (reason "senior review: same employer")))
+     (action (Escalate again)))
+    (Confirmed (by op-b) (reason "same person"))
+    ("unknown hit" (screening scr-1) (entry_id nope))
+    (((source Pep_list) (list_version 2026-10-13) (entry_id pep-1)
+      (matched_name "A. Example") (score 91) (algorithm jaro-winkler-1)))
+    (am-1)
+    |}]
+;;
+
+let%expect_test "duplicate entries are rejected" =
+  print_s
+    [%sexp
+      (Screening.create
+         ~id:(Screening_id.of_string "scr-2")
+         ~reason:List_update
+         ~screened_at:at
+         ~hits:[ hit Un_sc "un-1"; hit Un_sc "un-1" ]
+       |> Result.map ~f:(fun _ -> ())
+       : unit Or_error.t)];
+  [%expect {| (Error ("duplicate hit in screening" (entry_id un-1))) |}]
 ;;
 
 let%expect_test "stable digests" =
-  print_endline [%bin_digest: Screening.Outcome.Stable.V1.t];
-  print_endline [%bin_digest: Screening.Decision.Stable.V1.t];
+  print_endline [%bin_digest: Screening.Hit.Stable.V1.t];
+  print_endline [%bin_digest: Screening.Review_action.Stable.V1.t];
   [%expect
     {|
-    15774b4975223edbc3ade03b09ff97ef
-    836f509521655e074c59440363e0141d
+    6229de2add140e0cc4628968c257d834
+    896cc61de958cd543e8090c915458bcd
     |}]
 ;;
