@@ -1,14 +1,19 @@
-(** Risk-based customer risk rating (FATF Recommendation 1 and 10; PEPs under
-    Recommendation 12).
+(** Risk-based customer risk scoring (FATF R.1 and R.10; EBA/GL/2021/02).
 
-    The bank's methodology scores the country, product and channel factors (from its
-    country list, product catalogue and onboarding channel); this module combines them
-    with PEP exposure and adverse media into a rating, lists the enhanced due diligence
-    (EDD) triggers, and records any operator override with its rationale. *)
+    Inputs cover the four EBA factor groups: customer (sector, PEP status,
+    adverse media), country (residence, nationality), product (products,
+    expected volume, self-hosted wallet exposure) and delivery channel. A
+    versioned {!Model} turns inputs into points and a score from 0 to 100;
+    the score gives a {!Band}. Hard floors that weighting cannot remove (EBA
+    3.4-3.7): an active PEP, a high-risk third country or confirmed adverse
+    media make the band [High]. An operator may override the band with a
+    reason, but never below a hard floor. *)
 
 open! Core
 
-module Level : sig
+module Band : sig
+  (** Risk band. From a score: Low 0-29, Medium 30-59, High 60-100 (our cut-offs). *)
+
   module Stable : sig
     module V1 : sig
       type t =
@@ -26,125 +31,266 @@ module Level : sig
   [@@deriving compare, equal, hash, sexp, quickcheck, enumerate]
 
   include Comparable.S with type t := t
+
+  val of_score : int -> t
 end
 
-module Pep_exposure : sig
+module Country_risk : sig
+  (** From the bank's country list; [High_risk_third_country] comes from the loaded EU list. *)
+
   module Stable : sig
     module V1 : sig
       type t =
-        | Not_pep
-        | Domestic
-        | Foreign
-        | International_organisation
-        | Family_or_close_associate of t (** of a PEP of the given kind *)
+        | Standard
+        | Elevated
+        | High_risk_third_country (** on the EU list of high-risk third countries *)
       [@@deriving bin_io, compare, equal, hash, sexp]
     end
   end
 
   type t = Stable.V1.t =
-    | Not_pep
-    | Domestic
-    | Foreign
-    | International_organisation
-    | Family_or_close_associate of t
-  [@@deriving compare, equal, hash, sexp, quickcheck]
-
-  val is_pep : t -> bool
-
-  (** Foreign PEPs (and their family and associates) always need EDD under FATF R.12;
-      domestic and international-organisation PEPs need it when the relationship is higher
-      risk. *)
-  val is_foreign : t -> bool
+    | Standard
+    | Elevated
+    | High_risk_third_country (** on the EU list of high-risk third countries *)
+  [@@deriving compare, equal, hash, sexp, quickcheck, enumerate]
 end
 
-module Factors : sig
+module Adverse_media : sig
   module Stable : sig
     module V1 : sig
       type t =
-        { country : Level.Stable.V1.t (** residence and nationality, worst of *)
-        ; product : Level.Stable.V1.t
-        ; channel : Level.Stable.V1.t (** e.g. non-face-to-face onboarding *)
-        ; pep : Pep_exposure.Stable.V1.t
-        ; adverse_media : bool
-        }
+        | No_findings
+        | Unconfirmed
+        | Confirmed
       [@@deriving bin_io, compare, equal, hash, sexp]
     end
   end
 
   type t = Stable.V1.t =
-    { country : Level.t
-    ; product : Level.t
-    ; channel : Level.t
-    ; pep : Pep_exposure.t
-    ; adverse_media : bool
-    }
-  [@@deriving compare, equal, hash, sexp, quickcheck]
+    | No_findings
+    | Unconfirmed
+    | Confirmed
+  [@@deriving compare, equal, hash, sexp, quickcheck, enumerate]
+end
+
+module Product : sig
+  module Stable : sig
+    module V1 : sig
+      type t =
+        | Fiat_account
+        | Card
+        | Crypto
+        | Lightning
+      [@@deriving bin_io, compare, equal, hash, sexp]
+    end
+  end
+
+  type t = Stable.V1.t =
+    | Fiat_account
+    | Card
+    | Crypto
+    | Lightning
+  [@@deriving compare, equal, hash, sexp, quickcheck, enumerate]
+end
+
+module Volume_band : sig
+  (** Expected monthly volume, EUR. *)
+
+  module Stable : sig
+    module V1 : sig
+      type t =
+        | Up_to_1k
+        | Up_to_10k
+        | Up_to_100k
+        | Above_100k
+      [@@deriving bin_io, compare, equal, hash, sexp]
+    end
+  end
+
+  type t = Stable.V1.t =
+    | Up_to_1k
+    | Up_to_10k
+    | Up_to_100k
+    | Above_100k
+  [@@deriving compare, equal, hash, sexp, quickcheck, enumerate]
+end
+
+module Channel : sig
+  (** How the customer was onboarded. *)
+
+  module Stable : sig
+    module V1 : sig
+      type t =
+        | Face_to_face
+        | Eid_high (** electronic identification at eIDAS "high"; does not raise risk (EBA 4.29-4.31) *)
+        | Remote_attended
+        | Remote_unattended
+      [@@deriving bin_io, compare, equal, hash, sexp]
+    end
+  end
+
+  type t = Stable.V1.t =
+    | Face_to_face
+    | Eid_high (** electronic identification at eIDAS "high"; does not raise risk (EBA 4.29-4.31) *)
+    | Remote_attended
+    | Remote_unattended
+  [@@deriving compare, equal, hash, sexp, quickcheck, enumerate]
 end
 
 module Edd_trigger : sig
   module Stable : sig
     module V1 : sig
       type t =
-        | High_risk_rating
-        | Foreign_pep
-        | Pep_in_higher_risk_relationship
-        | High_risk_country
+        | Pep
+        | Family_or_close_associate
+        | High_risk_third_country
+        | Unusual_transaction (** from an escalated transaction-monitoring alert *)
+        | Self_hosted_exposure
         | Adverse_media
-        | Monitoring_alert (** an open high-severity monitoring alert *)
+        | Manual of string (** an operator's own reason *)
       [@@deriving bin_io, compare, equal, hash, sexp]
     end
   end
 
   type t = Stable.V1.t =
-    | High_risk_rating
-    | Foreign_pep
-    | Pep_in_higher_risk_relationship
-    | High_risk_country
+    | Pep
+    | Family_or_close_associate
+    | High_risk_third_country
+    | Unusual_transaction
+    | Self_hosted_exposure
     | Adverse_media
-    | Monitoring_alert
-  [@@deriving compare, equal, hash, sexp, quickcheck, enumerate]
+    | Manual of string
+  [@@deriving compare, equal, hash, sexp, quickcheck]
 end
 
-(** The rating the factors give: the worst factor, raised to [High] for any PEP of foreign
-    kind, and to at least [Medium] for any other PEP or for adverse media. *)
-val rate : Factors.t -> Level.t
-
-(** EDD triggers for factors and a final rating, without monitoring alerts. *)
-val edd_triggers : Factors.t -> rating:Level.t -> Edd_trigger.t list
-
-module Override : sig
+module Inputs : sig
   module Stable : sig
     module V1 : sig
       type t =
-        { rating : Level.Stable.V1.t
-        ; rationale : string
+        { sector : Band.Stable.V1.t (** occupation or business sector risk *)
+        ; pep : Pep.Stable.V1.t option
+        ; adverse_media : Adverse_media.Stable.V1.t
+        ; residence : Country_risk.Stable.V1.t
+        ; nationality : Country_risk.Stable.V1.t
+        ; products : Product.Stable.V1.t list
+        ; monthly_volume : Volume_band.Stable.V1.t
+        ; channel : Channel.Stable.V1.t
+        ; self_hosted_exposure : bool
+        ; manual_edd : string list (** operator reasons to apply EDD anyway *)
         }
       [@@deriving bin_io, compare, equal, hash, sexp]
     end
   end
 
   type t = Stable.V1.t =
-    { rating : Level.t
-    ; rationale : string
+    { sector : Band.t
+    ; pep : Pep.t option
+    ; adverse_media : Adverse_media.t
+    ; residence : Country_risk.t
+    ; nationality : Country_risk.t
+    ; products : Product.t list
+    ; monthly_volume : Volume_band.t
+    ; channel : Channel.t
+    ; self_hosted_exposure : bool
+    ; manual_edd : string list
+    }
+  [@@deriving compare, equal, hash, sexp, quickcheck]
+
+  (** Low-risk retail defaults: no PEP, no findings, standard countries, a
+      fiat account, up to 1k a month, face to face. *)
+  val baseline : t
+end
+
+(** EDD triggers that follow from the inputs on a date (PEP EDD ends at
+    [Pep.edd_until]). [Unusual_transaction] comes from monitoring, not from
+    here. *)
+val edd_triggers : Inputs.t -> on:Date.t -> Edd_trigger.t list
+
+(** The triggers that force [High] whatever the score. *)
+val hard_floors : Inputs.t -> on:Date.t -> Edd_trigger.t list
+
+module Model : sig
+  (** Points per input value. Versioned: an assessment records the version
+      it was scored with, and a change of weights is a new version. *)
+  type t [@@deriving compare, equal, sexp]
+
+  (** Our weights, version ["kyc-risk-2026-10"]. *)
+  val default : t
+
+  val version : t -> string
+
+  (** Points per factor for the inputs, before capping at 100. *)
+  val points : t -> Inputs.t -> on:Date.t -> (string * int) list
+
+  val score : t -> Inputs.t -> on:Date.t -> int
+end
+
+module Override : sig
+  module Stable : sig
+    module V1 : sig
+      type t =
+        { band : Band.Stable.V1.t
+        ; reason : string
+        ; by : Operator_id.Stable.V1.t
+        ; at : Timestamp.Stable.V1.t
+        }
+      [@@deriving bin_io, compare, equal, hash, sexp]
+    end
+  end
+
+  type t = Stable.V1.t =
+    { band : Band.t
+    ; reason : string
+    ; by : Operator_id.t
+    ; at : Timestamp.t
     }
   [@@deriving compare, equal, hash, sexp, quickcheck]
 end
 
-(** A recorded assessment. [rating] is [computed] unless an operator overrode it; an
-    override may raise the rating freely but lowering it below [computed] is refused for
-    foreign PEPs (EDD cannot be waived). *)
-type t =
-  { assessed_at : Timestamp.t
-  ; factors : Factors.t
-  ; computed : Level.t
-  ; rating : Level.t
-  ; override : (Override.t * Operator_id.t) option
-  }
-[@@deriving compare, equal, hash, sexp]
+module Assessment : sig
+  module Stable : sig
+    module V1 : sig
+      type t =
+        { inputs : Inputs.Stable.V1.t
+        ; model_version : string
+        ; score : int
+        ; floors : Edd_trigger.Stable.V1.t list
+        ; computed_band : Band.Stable.V1.t
+        ; override : Override.Stable.V1.t option
+        ; computed_at : Timestamp.Stable.V1.t
+        }
+      [@@deriving bin_io, compare, equal, hash, sexp]
+    end
+  end
 
-val assess
-  :  assessed_at:Timestamp.t
-  -> factors:Factors.t
-  -> override:Override.t option
-  -> actor:Actor.t
-  -> t Or_error.t
+  (** What was computed, kept as computed: replaying an old assessment never
+      rescored it with a newer model. *)
+  type t = Stable.V1.t =
+    { inputs : Inputs.t
+    ; model_version : string
+    ; score : int
+    ; floors : Edd_trigger.t list
+    ; computed_band : Band.t
+    ; override : Override.t option
+    ; computed_at : Timestamp.t
+    }
+  [@@deriving compare, equal, hash, sexp]
+
+  (** The override's band if any, else [computed_band]. *)
+  val band : t -> Band.t
+
+  (** Internal consistency of a recorded assessment: score in 0-100,
+      [computed_band] matches the score and the floors, and any override has
+      a reason and respects the floors. *)
+  val validate : t -> unit Or_error.t
+end
+
+val assess : Model.t -> Inputs.t -> at:Timestamp.t -> Assessment.t
+
+val override
+  :  Assessment.t
+  -> band:Band.t
+  -> reason:string
+  -> by:Operator_id.t
+  -> at:Timestamp.t
+  -> Assessment.t Or_error.t
