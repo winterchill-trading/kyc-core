@@ -1,71 +1,14 @@
 open! Core
 open Kyc_core
+open Fixtures
 
-let customer = Customer_id.of_string "cus-1"
-let operator = Actor.Operator (Operator_id.of_string "op-1")
-let provider = Actor.Provider "provider-a"
-let t0 = Time_ns.of_string_with_utc_offset "2026-10-13 09:00:00Z"
-let person = Test_person.person
-
-(* Events are built as drafts and numbered when applied, so ids and times follow
-   application order (OCaml evaluates list literals right to left). *)
-let counter = ref 0
-
-let number (draft : int -> Event.t) =
-  incr counter;
-  draft !counter
+let print_audit ?(audience = Visibility.Audience.Compliance) case =
+  List.iter
+    (Audit.for_audience (Kyc_case.audit case) audience)
+    ~f:(fun e -> print_s [%sexp (e.change : Audit.Change.t)])
 ;;
 
-let event ?(actor = provider) ?note ?id kind n : Event.t =
-  let id = Option.value id ~default:(sprintf "evt-%d" n) |> Event_id.of_string in
-  { id
-  ; customer_id = customer
-  ; at = Time_ns.add t0 (Time_ns.Span.of_int_sec (60 * n))
-  ; actor
-  ; note
-  ; kind
-  }
-;;
-
-let verified step = event (Step_changed { step; state = Verified t0 })
-
-let status ?(actor = operator) ?note transition =
-  event ~actor ?note (Status_changed transition)
-;;
-
-let standard : Risk.Factors.t =
-  { country = Low; product = Low; channel = Medium; pep = Not_pep; adverse_media = false }
-;;
-
-let assessed ?(factors = standard) () =
-  event ~actor:operator (Risk_assessed { factors; override = None })
-;;
-
-let show_case case =
-  print_s
-    [%message
-      ""
-        ~status:(Kyc_case.status case : Status.t)
-        ~tier:(Kyc_case.tier case : Tier.t)
-        ~verified_tier:(Kyc_case.verified_tier case : Tier.t)
-        ~missing:(Kyc_case.missing_steps case : Verification.Step.Set.t)]
-;;
-
-let apply_all case events =
-  List.fold events ~init:case ~f:(fun case draft ->
-    match Kyc_case.apply case (number draft) with
-    | Ok case -> case
-    | Error err ->
-      print_s [%sexp (err : Error.t)];
-      case)
-;;
-
-let opened () =
-  counter := 0;
-  apply_all (Kyc_case.create customer) [ event (Opened person) ]
-;;
-
-let%expect_test "happy path to T2 approval" =
+let%expect_test "happy path to approval" =
   let case = opened () in
   show_case case;
   let case = apply_all case [ verified Email; verified Mobile ] in
@@ -77,81 +20,47 @@ let%expect_test "happy path to T2 approval" =
       ; event (Step_changed { step = Identity_document; state = Sent })
       ; verified Identity_document
       ; verified Liveness
-      ; event
-          ~actor:System
-          (Screened { screening_id = Screening_id.of_string "scr-1"; outcome = Clear })
+      ; screened "scr-1" []
       ; assessed ()
       ]
   in
   show_case case;
+  print_s [%sexp (Kyc_case.cdd_level case ~now:t0 : Cdd_level.t)];
   let case = apply_all case [ status ~note:"documents consistent" Approve ] in
   show_case case;
-  List.iter
-    (Audit.entries (Kyc_case.audit case))
-    ~f:(fun e -> print_s [%sexp (e : Audit.Entry.t)]);
+  print_audit case;
   [%expect
     {|
-    ((status Created) (tier T0) (verified_tier T0) (missing (Email Mobile)))
-    ((status Created) (tier T1) (verified_tier T1)
-     (missing (Identity_document Liveness)))
-    ((status Verifying) (tier T1) (verified_tier T2)
+    ((status Created) (tier T0) (band ()) (missing (Email Mobile)))
+    ((status Created) (tier T1) (band ()) (missing (Identity_document Liveness)))
+    ((status Verifying) (tier T1) (band (Low))
      (missing (Address_proof Source_of_funds)))
-    ((status Approved) (tier T2) (verified_tier T2)
+    Simplified
+    ((status Approved) (tier T2) (band (Low))
      (missing (Address_proof Source_of_funds)))
-    ((at "2026-10-13 09:01:00Z") (actor (Provider provider-a)) (event_id evt-1)
-     (change Opened) (why ()))
-    ((at "2026-10-13 09:02:00Z") (actor (Provider provider-a)) (event_id evt-2)
-     (change
-      (Step (step Email) (from Pending) (to_ (Verified "2026-10-13 09:00:00Z"))))
-     (why ()))
-    ((at "2026-10-13 09:03:00Z") (actor (Provider provider-a)) (event_id evt-3)
-     (change
-      (Step (step Mobile) (from Pending) (to_ (Verified "2026-10-13 09:00:00Z"))))
-     (why ()))
-    ((at "2026-10-13 09:04:00Z") (actor System) (event_id evt-4)
-     (change (Status (from Created) (to_ Verifying))) (why ()))
-    ((at "2026-10-13 09:05:00Z") (actor (Provider provider-a)) (event_id evt-5)
-     (change (Step (step Identity_document) (from Pending) (to_ Sent))) (why ()))
-    ((at "2026-10-13 09:06:00Z") (actor (Provider provider-a)) (event_id evt-6)
-     (change
-      (Step (step Identity_document) (from Sent)
-       (to_ (Verified "2026-10-13 09:00:00Z"))))
-     (why ()))
-    ((at "2026-10-13 09:07:00Z") (actor (Provider provider-a)) (event_id evt-7)
-     (change
-      (Step (step Liveness) (from Pending)
-       (to_ (Verified "2026-10-13 09:00:00Z"))))
-     (why ()))
-    ((at "2026-10-13 09:08:00Z") (actor System) (event_id evt-8)
-     (change (Screened (screening_id scr-1) (hits 0))) (why ()))
-    ((at "2026-10-13 09:09:00Z") (actor (Operator op-1)) (event_id evt-9)
-     (change (Risk_assessed (computed Medium) (rating Medium))) (why ()))
-    ((at "2026-10-13 09:10:00Z") (actor (Operator op-1)) (event_id evt-10)
-     (change (Status (from Verifying) (to_ Approved)))
-     (why ("documents consistent")))
+    Opened
+    (Step (step Email) (from Pending) (to_ (Verified "2026-10-13 09:00:00Z")))
+    (Step (step Mobile) (from Pending) (to_ (Verified "2026-10-13 09:00:00Z")))
+    (Status (from Created) (to_ Verifying))
+    (Step (step Identity_document) (from Pending) (to_ Sent))
+    (Step (step Identity_document) (from Sent)
+     (to_ (Verified "2026-10-13 09:00:00Z")))
+    (Step (step Liveness) (from Pending) (to_ (Verified "2026-10-13 09:00:00Z")))
+    (Screened (screening_id scr-1) (reason Onboarding) (hits 0))
+    (Risk_assessed (score 0) (computed_band Low) (band Low)
+     (model_version kyc-risk-2026-10))
+    (Status (from Verifying) (to_ Approved))
     |}]
 ;;
 
 let%expect_test "approval guards" =
+  reset ();
   let case = apply_all (opened ()) [ verified Email; verified Mobile; status Submit ] in
-  print_s [%sexp (Kyc_case.can_approve case : unit Or_error.t)];
+  print_s [%sexp (Kyc_case.can_approve case ~now:t0 : unit Or_error.t)];
   let case = apply_all case [ verified Identity_document; verified Liveness ] in
-  print_s [%sexp (Kyc_case.can_approve case : unit Or_error.t)];
-  let hit : Screening.Hit.t =
-    { list_kind = Sanctions
-    ; list_name = "sanctions-list"
-    ; entry_ref = "e-7"
-    ; matched_name = "A. Example"
-    ; score = 90
-    }
-  in
-  let scr = Screening_id.of_string "scr-1" in
-  let case =
-    apply_all
-      case
-      [ event ~actor:System (Screened { screening_id = scr; outcome = Hits [ hit ] }) ]
-  in
-  print_s [%sexp (Kyc_case.can_approve case : unit Or_error.t)];
+  print_s [%sexp (Kyc_case.can_approve case ~now:t0 : unit Or_error.t)];
+  let case = apply_all case [ screened "scr-1" [ hit Pep_list "pep-9" ] ] in
+  print_s [%sexp (Kyc_case.can_approve case ~now:t0 : unit Or_error.t)];
   (* Approving now is an error and leaves the case as it was. *)
   let before = case in
   let case = apply_all case [ status Approve ] in
@@ -159,15 +68,13 @@ let%expect_test "approval guards" =
   let case =
     apply_all
       case
-      [ event
-          ~actor:operator
-          (Screening_reviewed
-             { screening_id = scr; decision = False_positive "different date of birth" })
+      [ review "scr-1" "pep-9" (Propose_discount "different date of birth")
+      ; review ~actor:op_b "scr-1" "pep-9" Confirm_discount
+      ; status Approve
+      ; assessed ()
       ; status Approve
       ]
   in
-  show_case case;
-  let case = apply_all case [ assessed (); status Approve ] in
   show_case case;
   [%expect
     {|
@@ -175,21 +82,18 @@ let%expect_test "approval guards" =
      ("steps not verified for approval" (approval_tier T2)
       (missing (Identity_document Liveness))))
     (Error "no screening recorded")
-    (Error ("screening blocks approval" (screenings ((scr-1 Pending_review)))))
-    ((event evt-8)
-     ("screening blocks approval" (screenings ((scr-1 Pending_review)))))
+    (Error ("screening hits not discounted" (screenings (scr-1))))
+    ((event evt-8) ("screening hits not discounted" (screenings (scr-1))))
     true
-    ((event evt-10) "no risk assessment recorded")
-    ((status Verifying) (tier T1) (verified_tier T2)
-     (missing (Address_proof Source_of_funds)))
-    ((status Approved) (tier T2) (verified_tier T2)
+    ((event evt-11) "no risk assessment recorded")
+    ((status Approved) (tier T2) (band (Low))
      (missing (Address_proof Source_of_funds)))
     |}]
 ;;
 
 let%expect_test "illegal events are errors, never exceptions" =
   let fresh = Kyc_case.create customer in
-  counter := 0;
+  reset ();
   let show case e =
     print_s
       [%sexp
@@ -198,20 +102,23 @@ let%expect_test "illegal events are errors, never exceptions" =
   in
   show fresh (verified Email);
   let case = opened () in
-  show case (event (Opened person));
+  show case (event (Opened Test_person.person));
   show case (status Approve);
   show case (event (Step_changed { step = Liveness; state = Expired }));
-  show case (event (Person_updated person));
+  show case (event (Person_updated Test_person.person));
   show case (fun n ->
     { (verified Email n) with customer_id = Customer_id.of_string "cus-2" });
+  show case (review "nope" "x" Take);
+  show case (status ~actor:System (Block "suspicious"));
+  show
+    case
+    (event ~actor:System (Legal_hold_set { until = t0; reason = "x"; authority = "y" }));
   show
     case
     (event
-       (Screening_reviewed
-          { screening_id = Screening_id.of_string "nope"; decision = True_match "" }));
-  show case (status ~actor:System (Block "suspicious"));
-  let case = apply_all case [ status Submit ] in
-  show case (event (Person_updated { person with email = Pii.create "new@example.com" }));
+       ~actor:op_a
+       (Alert_decided
+          { alert_id = Monitoring.Alert_id.of_string "a"; decision = Escalated }));
   [%expect
     {|
     (Error ((event evt-1) "case not opened yet"))
@@ -225,15 +132,15 @@ let%expect_test "illegal events are errors, never exceptions" =
        ("illegal verification transition" (from Pending) (to_ Expired)))))
     (Error ((event evt-5) "person update changes nothing"))
     (Error ("event is for another customer" (case cus-1) (event cus-2)))
-    (Error ((event evt-7) ("unknown screening" (screening_id nope))))
+    (Error ((event evt-7) (unknown (what screening) (id nope))))
     (Error
      ((event evt-8)
       ("only a compliance operator may block or unblock" (actor System)
        (transition (Block suspicious)))))
     (Error
-     ((event evt-10)
-      ("person can only change before submission or when resubmission is requested"
-       (status Verifying))))
+     ((event evt-9)
+      ("only an operator may do this" (what "set a legal hold") (actor System))))
+    (Error ((event evt-10) (unknown (what alert) (id a))))
     |}]
 ;;
 
@@ -247,11 +154,12 @@ let%expect_test "resubmission" =
           (Request_resubmission [ Residential_address ])
       ]
   in
-  show_case case;
+  print_s [%sexp (Kyc_case.customer_view case : Kyc_case.Customer_view.t)];
   let moved =
-    { person with
+    { Test_person.person with
       residential_address =
-        Pii.map person.residential_address ~f:(fun a -> { a with city = "Hamburg" })
+        Pii.map Test_person.person.residential_address ~f:(fun a ->
+          { a with city = "Hamburg" })
     }
   in
   let case =
@@ -260,14 +168,13 @@ let%expect_test "resubmission" =
       [ event ~actor:System (Person_updated moved); status ~actor:System Submit ]
   in
   show_case case;
-  List.iter
-    (Audit.entries (Kyc_case.audit case))
-    ~f:(fun e -> print_s [%sexp (e.change : Audit.Change.t)]);
+  print_audit case;
   [%expect
     {|
-    ((status (Needs_resubmission (Residential_address))) (tier T1)
-     (verified_tier T1) (missing (Identity_document Liveness)))
-    ((status Verifying) (tier T1) (verified_tier T1)
+    ((status Action_required) (tier T1)
+     (steps_to_complete (Identity_document Liveness))
+     (fields_to_resubmit (Residential_address)))
+    ((status Verifying) (tier T1) (band ())
      (missing (Identity_document Liveness)))
     Opened
     (Step (step Email) (from Pending) (to_ (Verified "2026-10-13 09:00:00Z")))
@@ -279,63 +186,13 @@ let%expect_test "resubmission" =
     |}]
 ;;
 
-let%expect_test "block and unblock" =
-  let case = apply_all (opened ()) [ verified Email; verified Mobile ] in
-  show_case case;
-  let case =
-    apply_all
-      case
-      [ status ~note:"adverse media under review" (Block "compliance review") ]
-  in
-  show_case case;
-  let case = apply_all case [ status Unblock ] in
-  show_case case;
-  [%expect
-    {|
-    ((status Created) (tier T1) (verified_tier T1)
-     (missing (Identity_document Liveness)))
-    ((status (Blocked (reason "compliance review") (previous Created))) (tier T0)
-     (verified_tier T1) (missing (Identity_document Liveness)))
-    ((status Created) (tier T1) (verified_tier T1)
-     (missing (Identity_document Liveness)))
-    |}]
-;;
-
-let%expect_test "rejected is final" =
-  let case =
-    apply_all
-      (opened ())
-      [ verified Email
-      ; verified Mobile
-      ; status Submit
-      ; status (Reject "document forged")
-      ]
-  in
-  show_case case;
-  let case = apply_all case [ status Submit; status Approve ] in
-  show_case case;
-  [%expect
-    {|
-    ((status (Rejected "document forged")) (tier T0) (verified_tier T1)
-     (missing (Identity_document Liveness)))
-    ((event evt-6)
-     ("illegal status transition" (from (Rejected "document forged"))
-      (transition Submit)))
-    ((event evt-7)
-     ("illegal status transition" (from (Rejected "document forged"))
-      (transition Approve)))
-    ((status (Rejected "document forged")) (tier T0) (verified_tier T1)
-     (missing (Identity_document Liveness)))
-    |}]
-;;
-
 let%expect_test "a redelivered event is a no-op; a reused id is an error" =
   let case = opened () in
   let e =
-    event
-      ~id:"provider-delivery-9"
-      (Step_changed { step = Email; state = Verified t0 })
-      99
+    number
+      (event
+         ~id:"provider-delivery-9"
+         (Step_changed { step = Email; state = Verified t0 }))
   in
   let once = Or_error.ok_exn (Kyc_case.apply case e) in
   let twice = Or_error.ok_exn (Kyc_case.apply once e) in
@@ -371,142 +228,189 @@ let%expect_test "limits hook" =
   [%expect {| ((daily_eur_minor 10000)) |}]
 ;;
 
-let ready_for_approval ?(factors = standard) () =
-  apply_all
-    (opened ())
-    [ verified Email
-    ; verified Mobile
-    ; status Submit
-    ; verified Identity_document
-    ; verified Liveness
-    ; event
-        ~actor:System
-        (Screened { screening_id = Screening_id.of_string "scr-1"; outcome = Clear })
-    ; assessed ~factors ()
-    ]
+let foreign_pep =
+  Or_error.ok_exn
+    (Pep.create
+       ~kind:Pep
+       ~scope:Foreign
+       ~function_:"minister"
+       ~started:(Date.of_string "2015-01-01")
+       ())
 ;;
 
-let show_follow_ups case ~now =
-  print_s
-    [%sexp
-      (Kyc_case.follow_ups case ~now:(Time_ns.of_string_with_utc_offset now)
-       : Kyc_case.Follow_up.t list)]
-;;
-
-let%expect_test "a foreign PEP needs EDD: T3 steps and senior approval" =
-  let case = ready_for_approval ~factors:{ standard with pep = Foreign } () in
-  print_s [%sexp (Kyc_case.edd_triggers case : Risk.Edd_trigger.t list)];
-  print_s [%sexp (Kyc_case.can_approve case : unit Or_error.t)];
+let%expect_test "a PEP needs EDD: T3 steps and senior approval" =
+  let inputs = { Risk.Inputs.baseline with pep = Some foreign_pep } in
+  let case = ready_for_approval ~inputs () in
+  print_s [%sexp (Kyc_case.cdd_level case ~now:t0 : Cdd_level.t)];
+  print_s [%sexp (Kyc_case.can_approve case ~now:t0 : unit Or_error.t)];
   let case = apply_all case [ verified Address_proof; verified Source_of_funds ] in
-  print_s [%sexp (Kyc_case.can_approve case : unit Or_error.t)];
   (* Senior approval must come from an operator and carry a rationale. *)
   let case =
     apply_all
       case
       [ event ~actor:System Senior_approval
-      ; event ~actor:operator Senior_approval
-      ; event ~actor:operator ~note:"source of wealth documented" Senior_approval
+      ; event ~actor:op_b Senior_approval
+      ; event ~actor:op_b ~note:"source of wealth documented" Senior_approval
       ; status Approve
       ]
   in
   show_case case;
-  (* A new assessment needs a new sign-off before the next review. *)
+  (* A new assessment needs a new sign-off. *)
   let case =
-    apply_all
-      case
-      [ assessed ~factors:{ standard with pep = Foreign; product = High } () ]
+    apply_all case [ assessed ~inputs:{ inputs with monthly_volume = Up_to_100k } () ]
   in
   show_follow_ups case ~now:"2026-10-14 00:00:00Z";
   [%expect
     {|
-    (High_risk_rating Foreign_pep)
+    Enhanced
     (Error
      ("enhanced due diligence outstanding"
       (edd
-       (Edd_outstanding (triggers (High_risk_rating Foreign_pep))
+       (Edd_outstanding (triggers (Pep))
         (missing_steps (Address_proof Source_of_funds)) (senior_approval true)))))
-    (Error
-     ("enhanced due diligence outstanding"
-      (edd
-       (Edd_outstanding (triggers (High_risk_rating Foreign_pep))
-        (missing_steps ()) (senior_approval true)))))
     ((event evt-11)
      ("only an operator may do this" (what "give senior approval")
       (actor System)))
     ((event evt-12) "senior approval needs a rationale in the note")
-    ((status Approved) (tier T3) (verified_tier T3) (missing ()))
-    ((Edd_outstanding (triggers (High_risk_rating Foreign_pep))
-      (missing_steps ()) (senior_approval true)))
+    ((status Approved) (tier T3) (band (High)) (missing ()))
+    ((Edd_outstanding (triggers (Pep)) (missing_steps ()) (senior_approval true)))
     |}]
 ;;
 
-let%expect_test "standard due diligence needs no senior approval" =
+let%expect_test "simplified and standard due diligence need no senior approval" =
   let case = ready_for_approval () in
+  print_s [%sexp (Kyc_case.cdd_level case ~now:t0 : Cdd_level.t)];
+  let case = apply_all case [ event ~actor:op_a ~note:"x" Senior_approval ] in
+  ignore (case : Kyc_case.t);
+  let crypto = { Risk.Inputs.baseline with products = [ Crypto ] } in
   print_s
     [%sexp
-      (Kyc_case.apply case (number (event ~actor:operator ~note:"x" Senior_approval))
-       |> Result.map ~f:Kyc_case.status
-       : Status.t Or_error.t)];
-  [%expect {| (Error ((event evt-9) "no enhanced due diligence applies")) |}]
-;;
-
-let%expect_test "periodic review due dates follow the rating" =
-  List.iter Risk.Level.all ~f:(fun level ->
-    let factors = { standard with country = level; channel = level } in
-    let edd =
-      match level with
-      | High ->
-        [ verified Address_proof
-        ; verified Source_of_funds
-        ; event
-            ~actor:operator
-            ~note:"high-risk country, funds documented"
-            Senior_approval
-        ]
-      | Low | Medium -> []
-    in
-    let case = apply_all (ready_for_approval ~factors ()) (edd @ [ status Approve ]) in
-    print_s
-      [%message
-        ""
-          ~rating:(level : Risk.Level.t)
-          ~approved:(Kyc_case.last_review_at case : Timestamp.t option)
-          ~due:(Kyc_case.next_review_due case : Timestamp.t option)]);
+      (Kyc_case.cdd_level (ready_for_approval ~inputs:crypto ()) ~now:t0 : Cdd_level.t)];
   [%expect
     {|
-    ((rating Low) (approved ("2026-10-13 09:09:00Z"))
-     (due ("2031-10-12 09:09:00Z")))
-    ((rating Medium) (approved ("2026-10-13 09:09:00Z"))
-     (due ("2029-10-12 09:09:00Z")))
-    ((rating High) (approved ("2026-10-13 09:12:00Z"))
-     (due ("2027-10-13 09:12:00Z")))
+    Simplified
+    ((event evt-9) "no enhanced due diligence applies")
+    Standard
+    |}]
+;;
+
+let%expect_test "periodic review due dates follow the band" =
+  List.iter
+    [ "Low", Risk.Inputs.baseline
+    ; ( "Medium"
+      , { Risk.Inputs.baseline with residence = Elevated; channel = Remote_unattended } )
+    ; ( "High"
+      , { Risk.Inputs.baseline with
+          sector = High
+        ; residence = Elevated
+        ; channel = Remote_unattended
+        } )
+    ]
+    ~f:(fun (name, inputs) ->
+      let case =
+        apply_all
+          (ready_for_approval ~inputs ())
+          [ verified Address_proof
+          ; verified Source_of_funds
+          ; event ~actor:op_b ~note:"high-risk profile reviewed" Senior_approval
+          ; status Approve
+          ]
+      in
+      print_s
+        [%message
+          name
+            ~band:(Kyc_case.band case : Risk.Band.t option)
+            ~due:(Kyc_case.next_review_due case : Timestamp.t option)]);
+  (* A band change moves the due date. *)
+  let case = apply_all (ready_for_approval ()) [ status Approve ] in
+  print_s [%sexp (Kyc_case.next_review_due case : Timestamp.t option)];
+  let case =
+    apply_all case [ assessed ~override:(Medium, "employer under investigation") () ]
+  in
+  print_s [%sexp (Kyc_case.next_review_due case : Timestamp.t option)];
+  [%expect
+    {|
+    ((event evt-11) "no enhanced due diligence applies")
+    (Low (band (Low)) (due ("2031-10-12 09:12:00Z")))
+    ((event evt-11) "no enhanced due diligence applies")
+    (Medium (band (Medium)) (due ("2029-10-12 09:12:00Z")))
+    (High (band (High)) (due ("2027-10-13 09:12:00Z")))
+    ("2031-10-12 09:09:00Z")
+    ("2029-10-12 09:09:00Z")
     |}]
 ;;
 
 let%expect_test "completing a periodic review" =
   let case = apply_all (ready_for_approval ()) [ status Approve ] in
-  show_follow_ups case ~now:"2030-01-01 00:00:00Z";
-  (* The review needs a fresh rating. *)
-  let case = apply_all case [ event ~actor:operator Periodic_review_completed ] in
+  show_follow_ups case ~now:"2032-01-01 00:00:00Z";
+  let case = apply_all case [ event ~actor:op_a Periodic_review_completed ] in
   let case =
     apply_all
       case
-      [ assessed (); event ~actor:operator ~note:"no changes" Periodic_review_completed ]
+      [ assessed (); event ~actor:op_a ~note:"no changes" Periodic_review_completed ]
   in
   print_s [%sexp (Kyc_case.next_review_due case : Timestamp.t option)];
-  show_follow_ups case ~now:"2030-01-01 00:00:00Z";
   [%expect
     {|
-    ((Periodic_review_due "2029-10-12 09:09:00Z"))
+    ((Periodic_review_due "2031-10-12 09:09:00Z"))
     ((event evt-10) "a review needs a risk assessment since the last review")
-    ("2029-10-12 09:12:00Z")
-    ((Periodic_review_due "2029-10-12 09:12:00Z"))
+    ("2031-10-12 09:12:00Z")
     |}]
 ;;
 
-let%expect_test "monitoring alerts" =
+let%expect_test "a confirmed sanctions match blocks the customer, silently" =
+  let case = apply_all (ready_for_approval ()) [ status Approve ] in
+  let case =
+    apply_all
+      case
+      [ screened ~reason:List_update "scr-2" [ hit Eu_fsf "eu-77" ]
+      ; review "scr-2" "eu-77" (Confirm "same name, date of birth and nationality")
+      ]
+  in
+  show_case case;
+  print_s [%sexp (Kyc_case.customer_view case : Kyc_case.Customer_view.t)];
+  print_endline "-- customer audit";
+  print_audit ~audience:Customer case;
+  print_endline "-- compliance audit, last three";
+  List.iter
+    (List.rev (List.take (List.rev (Audit.entries (Kyc_case.audit case))) 3))
+    ~f:(fun e -> print_s [%sexp (e : Audit.Entry.t)]);
+  [%expect
+    {|
+    ((status (Blocked (reason "confirmed sanctions match") (previous Approved)))
+     (tier T0) (band (Low)) (missing (Address_proof Source_of_funds)))
+    ((status Under_review) (tier T0) (steps_to_complete ())
+     (fields_to_resubmit ()))
+    -- customer audit
+    Opened
+    (Step (step Email) (from Pending) (to_ (Verified "2026-10-13 09:00:00Z")))
+    (Step (step Mobile) (from Pending) (to_ (Verified "2026-10-13 09:00:00Z")))
+    (Status (from Created) (to_ Verifying))
+    (Step (step Identity_document) (from Pending)
+     (to_ (Verified "2026-10-13 09:00:00Z")))
+    (Step (step Liveness) (from Pending) (to_ (Verified "2026-10-13 09:00:00Z")))
+    (Status (from Verifying) (to_ Approved))
+    -- compliance audit, last three
+    ((at "2026-10-13 09:10:00Z") (actor System) (event_id evt-10)
+     (change (Screened (screening_id scr-2) (reason List_update) (hits 1)))
+     (why ()))
+    ((at "2026-10-13 09:11:00Z") (actor (Operator op-a)) (event_id evt-11)
+     (change
+      (Hit_reviewed (screening_id scr-2) (entry_id eu-77)
+       (action (Confirm "same name, date of birth and nationality"))))
+     (why ()))
+    ((at "2026-10-13 09:11:00Z") (actor (Operator op-a)) (event_id evt-11)
+     (change
+      (Status (from Approved)
+       (to_ (Blocked (reason "confirmed sanctions match") (previous Approved)))))
+     (why ()))
+    |}]
+;;
+
+let%expect_test "monitoring, investigation and report" =
   let case = apply_all (ready_for_approval ()) [ status Approve ] in
   let alert = Monitoring.Alert_id.of_string "alert-1" in
+  let inv = Investigation.Investigation_id.of_string "inv-1" in
   let case =
     apply_all
       case
@@ -518,80 +422,146 @@ let%expect_test "monitoring alerts" =
              ; severity = High
              ; summary = "inflows far above declared income"
              })
+      ; event ~actor:System (Alert_decided { alert_id = alert; decision = Escalated })
+      ; event
+          ~actor:op_a
+          (Investigation_opened { investigation_id = inv; alerts = [ alert ] })
+      ; event ~actor:op_a (Alert_decided { alert_id = alert; decision = Escalated })
+      ; event
+          ~actor:op_a
+          (Investigation_opened { investigation_id = inv; alerts = [ alert ] })
       ]
   in
-  print_s [%sexp (Kyc_case.edd_triggers case : Risk.Edd_trigger.t list)];
-  show_follow_ups case ~now:"2026-10-14 00:00:00Z";
+  print_s [%sexp (Kyc_case.edd_triggers case ~now:t0 : Risk.Edd_trigger.t list)];
+  print_s [%sexp (Kyc_case.cdd_level case ~now:t0 : Cdd_level.t)];
   let case =
     apply_all
       case
-      [ event ~actor:System (Alert_closed { alert_id = alert; resolution = No_action })
+      [ event
+          ~actor:op_a
+          (Investigation_moved { investigation_id = inv; state = Investigating })
       ; event
-          ~actor:operator
-          ~note:"salary change confirmed"
-          (Alert_closed { alert_id = alert; resolution = No_action })
-      ; event ~actor:operator (Alert_closed { alert_id = alert; resolution = Reported })
+          ~actor:op_a
+          (Investigation_moved { investigation_id = inv; state = Pending_decision })
+      ; event ~actor:op_a (Report_changed { investigation_id = inv; state = Draft })
+      ; event ~actor:op_a (Report_changed { investigation_id = inv; state = Approved })
+      ; event ~actor:op_b (Report_changed { investigation_id = inv; state = Approved })
+      ; event
+          ~actor:op_a
+          (Investigation_moved { investigation_id = inv; state = Closed_reported })
+      ; event ~actor:op_a (Report_changed { investigation_id = inv; state = Filed })
+      ; event
+          ~actor:op_a
+          (Investigation_moved { investigation_id = inv; state = Closed_reported })
+      ; event
+          ~actor:System
+          (Fiu_request_received
+             { request_id = Investigation.Request_id.of_string "fiu-1"
+             ; received_on = Date.of_string "2026-10-16"
+             })
       ]
   in
-  print_s [%sexp (Kyc_case.edd_triggers case : Risk.Edd_trigger.t list)];
-  show_follow_ups case ~now:"2026-10-14 00:00:00Z";
+  show_follow_ups case ~now:"2026-10-17 00:00:00Z";
+  print_s [%sexp (Kyc_case.customer_view case : Kyc_case.Customer_view.t)];
+  print_endline "-- support sees";
+  print_audit ~audience:Support case;
+  print_endline "-- customer sees";
+  print_audit ~audience:Customer case;
   [%expect
     {|
-    (Monitoring_alert)
-    ((Edd_outstanding (triggers (Monitoring_alert))
-      (missing_steps (Address_proof Source_of_funds)) (senior_approval true))
-     (Open_alerts (alert-1)))
     ((event evt-11)
-     ("only an operator may do this" (what "close an alert") (actor System)))
-    ((event evt-13) ("alert already closed" (alert_id alert-1)))
-    ()
-    ()
+     ("only an operator may do this" (what "decide an alert") (actor System)))
+    ((event evt-12) ("only escalated alerts are investigated" (id alert-1)))
+    (Unusual_transaction)
+    Enhanced
+    ((event evt-18) "a report is approved by someone other than its drafter")
+    ((event evt-20) "the report must be filed before closing as reported")
+    ((Edd_outstanding (triggers (Unusual_transaction))
+      (missing_steps (Address_proof Source_of_funds)) (senior_approval true))
+     (Fiu_request_due ((fiu-1 2026-10-23))))
+    ((status Active) (tier T2) (steps_to_complete ()) (fields_to_resubmit ()))
+    -- support sees
+    Opened
+    (Step (step Email) (from Pending) (to_ (Verified "2026-10-13 09:00:00Z")))
+    (Step (step Mobile) (from Pending) (to_ (Verified "2026-10-13 09:00:00Z")))
+    (Status (from Created) (to_ Verifying))
+    (Step (step Identity_document) (from Pending)
+     (to_ (Verified "2026-10-13 09:00:00Z")))
+    (Step (step Liveness) (from Pending) (to_ (Verified "2026-10-13 09:00:00Z")))
+    (Screened (screening_id scr-1) (reason Onboarding) (hits 0))
+    (Risk_assessed (score 0) (computed_band Low) (band Low)
+     (model_version kyc-risk-2026-10))
+    (Status (from Verifying) (to_ Approved))
+    -- customer sees
+    Opened
+    (Step (step Email) (from Pending) (to_ (Verified "2026-10-13 09:00:00Z")))
+    (Step (step Mobile) (from Pending) (to_ (Verified "2026-10-13 09:00:00Z")))
+    (Status (from Created) (to_ Verifying))
+    (Step (step Identity_document) (from Pending)
+     (to_ (Verified "2026-10-13 09:00:00Z")))
+    (Step (step Liveness) (from Pending) (to_ (Verified "2026-10-13 09:00:00Z")))
+    (Status (from Verifying) (to_ Approved))
     |}]
 ;;
 
-let%expect_test "screening finds a PEP the rating missed" =
-  let case = ready_for_approval () in
-  let scr = Screening_id.of_string "scr-2" in
-  let hit : Screening.Hit.t =
-    { list_kind = Pep
-    ; list_name = "pep-list"
-    ; entry_ref = "e-1"
-    ; matched_name = "A. Example"
-    ; score = 97
-    }
-  in
+let%expect_test "screening finds a PEP the assessment missed" =
   let case =
     apply_all
-      case
-      [ event ~actor:System (Screened { screening_id = scr; outcome = Hits [ hit ] })
-      ; event
-          ~actor:operator
-          ~note:"same date of birth and address"
-          (Screening_reviewed { screening_id = scr; decision = True_match "confirmed" })
+      (ready_for_approval ())
+      [ screened "scr-2" [ hit Pep_list "pep-3" ]
+      ; review "scr-2" "pep-3" (Confirm "same date of birth and address")
       ]
   in
   show_follow_ups case ~now:"2026-10-14 00:00:00Z";
   [%expect {| (Risk_assessment_needed) |}]
 ;;
 
-let%expect_test "closure starts the retention clock and freezes the record" =
+let%expect_test "rejection and closure start retention; legal holds extend it" =
+  let refused =
+    apply_all (ready_for_approval ()) [ status (Reject "documents forged") ]
+  in
+  print_s [%sexp (Kyc_case.retain_until refused : Timestamp.t option)];
   let case = apply_all (ready_for_approval ()) [ status Approve ] in
+  print_s [%sexp (Kyc_case.retain_until case : Timestamp.t option)];
   let case =
     apply_all case [ status ~note:"customer request" (Close "account closed") ]
   in
-  show_case case;
   print_s [%sexp (Kyc_case.retain_until case : Timestamp.t option)];
+  print_s [%sexp (Kyc_case.customer_view case : Kyc_case.Customer_view.t)];
+  (* Frozen after closure, apart from monitoring, reporting and retention. *)
   let case = apply_all case [ verified Address_proof; assessed () ] in
-  show_follow_ups case ~now:"2031-10-12 00:00:00Z";
-  show_follow_ups case ~now:"2031-10-13 00:00:00Z";
+  let hold until : Retention.Legal_hold.t =
+    { until = Time_ns.of_string_with_utc_offset until
+    ; reason = "ongoing criminal investigation"
+    ; authority = "public prosecutor"
+    }
+  in
+  let case =
+    apply_all
+      case
+      [ event ~actor:op_a (Legal_hold_set (hold "2040-01-01 00:00:00Z"))
+      ; event ~actor:op_a (Legal_hold_set (hold "2033-01-01 00:00:00Z"))
+      ]
+  in
+  print_s [%sexp (Kyc_case.retain_until case : Timestamp.t option)];
+  show_follow_ups case ~now:"2032-01-01 00:00:00Z";
+  show_follow_ups case ~now:"2033-01-02 00:00:00Z";
+  let case = apply_all case [ event ~actor:op_a Legal_hold_released ] in
+  show_follow_ups case ~now:"2032-01-01 00:00:00Z";
   [%expect
     {|
-    ((status (Closed "account closed")) (tier T0) (verified_tier T2)
-     (missing (Address_proof Source_of_funds)))
+    ("2031-10-12 09:09:00Z")
+    ()
     ("2031-10-12 09:10:00Z")
+    ((status Closed) (tier T0) (steps_to_complete ()) (fields_to_resubmit ()))
     ((event evt-11) ("case is closed" (status (Closed "account closed"))))
     ((event evt-12) ("case is closed" (status (Closed "account closed"))))
+    ((event evt-13)
+     ("a legal hold extends retention by at most 5 years"
+      (retention_ends "2031-10-12 09:10:00Z") (until "2040-01-01 00:00:00Z")))
+    ("2033-01-01 00:00:00Z")
     ()
+    ((Retention_ended "2033-01-01 00:00:00Z"))
     ((Retention_ended "2031-10-12 09:10:00Z"))
     |}]
 ;;
