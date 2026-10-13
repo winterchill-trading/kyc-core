@@ -27,6 +27,20 @@ module Change : sig
             { screening_id : Screening_id.Stable.V1.t
             ; decision : Screening.Decision.Stable.V1.t
             }
+        | Risk_assessed of
+            { computed : Risk.Level.Stable.V1.t
+            ; rating : Risk.Level.Stable.V1.t
+            }
+        | Senior_approval
+        | Periodic_review_completed
+        | Alert_raised of
+            { alert_id : Monitoring.Alert_id.Stable.V1.t
+            ; severity : Risk.Level.Stable.V1.t
+            }
+        | Alert_closed of
+            { alert_id : Monitoring.Alert_id.Stable.V1.t
+            ; resolution : Monitoring.Resolution.Stable.V1.t
+            }
       [@@deriving bin_io, compare, equal, hash, sexp]
     end
   end
@@ -50,6 +64,20 @@ module Change : sig
     | Screening_reviewed of
         { screening_id : Screening_id.t
         ; decision : Screening.Decision.t
+        }
+    | Risk_assessed of
+        { computed : Risk.Level.t
+        ; rating : Risk.Level.t
+        }
+    | Senior_approval
+    | Periodic_review_completed
+    | Alert_raised of
+        { alert_id : Monitoring.Alert_id.t
+        ; severity : Risk.Level.t
+        }
+    | Alert_closed of
+        { alert_id : Monitoring.Alert_id.t
+        ; resolution : Monitoring.Resolution.t
         }
   [@@deriving compare, equal, hash, sexp]
 end

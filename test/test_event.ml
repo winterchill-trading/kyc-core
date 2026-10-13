@@ -42,8 +42,8 @@ let%expect_test "stable digests" =
   print_endline [%bin_digest: Event_id.Stable.V1.t];
   [%expect
     {|
-    613ee1417ea3ce177f65fbd822d9152d
-    3990982767e145349d02fc33aa91f092
+    ccf697536e0d1e9d38a7e293ebfc6c40
+    fbce6c807a266a6a0dc45a0f9e8eb4a8
     f34dd673104d7fb8f766f5d7534e5088
     ccd424464ba7e6c22cebb7c939d997b2
     e01ddfc6032e4d2c1e9fedae4a0467a0
