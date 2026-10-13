@@ -1,5 +1,5 @@
-(** Investigations of escalated alerts and suspicious activity reports to
-    the financial intelligence unit (FIU) (FATF R.20; AMLR Art. 69).
+(** Investigations of escalated alerts and suspicious activity reports to the financial
+    intelligence unit (FIU) (FATF R.20; AMLR Art. 69).
 
     {v
       case:   Open -> Investigating -> Pending_decision -> Closed_no_report
@@ -8,13 +8,11 @@
               Rejected_by_fiu -> Draft (corrected and resubmitted)
     v}
 
-    Report approval needs an operator other than the one who drafted it.
-    FIU information requests are due 5 working days after receipt (AMLR
-    Art. 69(1)(b)). Everything here is restricted (tipping-off): see
-    {!Visibility}. *)
+    Report approval needs an operator other than the one who drafted it. FIU information
+    requests are due 5 working days after receipt (AMLR Art. 69(1)(b)). Everything here is
+    restricted (tipping-off): see {!Visibility}. *)
 
 open! Core
-
 module Investigation_id : String_id.S
 module Request_id : String_id.S
 
@@ -71,7 +69,12 @@ type t =
   }
 [@@deriving compare, equal, hash, sexp]
 
-val open_ : id:Investigation_id.t -> at:Timestamp.t -> alerts:Monitoring.Alert_id.t list -> t
+val open_
+  :  id:Investigation_id.t
+  -> at:Timestamp.t
+  -> alerts:Monitoring.Alert_id.t list
+  -> t
+
 val move : t -> Case_state.t -> t Or_error.t
 val report : t -> Report_state.t -> by:Operator_id.t -> t Or_error.t
 val is_closed : t -> bool
@@ -85,9 +88,14 @@ module Fiu_request : sig
     }
   [@@deriving compare, equal, hash, sexp]
 
-  (** [due] is 5 working days after [received_on], skipping weekends and
-      [is_holiday] (default: none; pass the FIU country's calendar). *)
-  val create : ?is_holiday:(Date.t -> bool) -> id:Request_id.t -> received_on:Date.t -> unit -> t
+  (** [due] is 5 working days after [received_on], skipping weekends and [is_holiday]
+      (default: none; pass the FIU country's calendar). *)
+  val create
+    :  ?is_holiday:(Date.t -> bool)
+    -> id:Request_id.t
+    -> received_on:Date.t
+    -> unit
+    -> t
 
   val overdue : t -> on:Date.t -> bool
 end

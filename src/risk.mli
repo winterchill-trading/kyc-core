@@ -1,13 +1,12 @@
 (** Risk-based customer risk scoring (FATF R.1 and R.10; EBA/GL/2021/02).
 
-    Inputs cover the four EBA factor groups: customer (sector, PEP status,
-    adverse media), country (residence, nationality), product (products,
-    expected volume, self-hosted wallet exposure) and delivery channel. A
-    versioned {!Model} turns inputs into points and a score from 0 to 100;
-    the score gives a {!Band}. Hard floors that weighting cannot remove (EBA
-    3.4-3.7): an active PEP, a high-risk third country or confirmed adverse
-    media make the band [High]. An operator may override the band with a
-    reason, but never below a hard floor. *)
+    Inputs cover the four EBA factor groups: customer (sector, PEP status, adverse media),
+    country (residence, nationality), product (products, expected volume, self-hosted
+    wallet exposure) and delivery channel. A versioned {!Model} turns inputs into points
+    and a score from 0 to 100; the score gives a {!Band}. Hard floors that weighting
+    cannot remove (EBA 3.4-3.7): an active PEP, a high-risk third country or confirmed
+    adverse media make the band [High]. An operator may override the band with a reason,
+    but never below a hard floor. *)
 
 open! Core
 
@@ -36,7 +35,8 @@ module Band : sig
 end
 
 module Country_risk : sig
-  (** From the bank's country list; [High_risk_third_country] comes from the loaded EU list. *)
+  (** From the bank's country list; [High_risk_third_country] comes from the loaded EU
+      list. *)
 
   module Stable : sig
     module V1 : sig
@@ -122,7 +122,8 @@ module Channel : sig
     module V1 : sig
       type t =
         | Face_to_face
-        | Eid_high (** electronic identification at eIDAS "high"; does not raise risk (EBA 4.29-4.31) *)
+        | Eid_high
+        (** electronic identification at eIDAS "high"; does not raise risk (EBA 4.29-4.31) *)
         | Remote_attended
         | Remote_unattended
       [@@deriving bin_io, compare, equal, hash, sexp]
@@ -131,7 +132,8 @@ module Channel : sig
 
   type t = Stable.V1.t =
     | Face_to_face
-    | Eid_high (** electronic identification at eIDAS "high"; does not raise risk (EBA 4.29-4.31) *)
+    | Eid_high
+    (** electronic identification at eIDAS "high"; does not raise risk (EBA 4.29-4.31) *)
     | Remote_attended
     | Remote_unattended
   [@@deriving compare, equal, hash, sexp, quickcheck, enumerate]
@@ -196,22 +198,21 @@ module Inputs : sig
     }
   [@@deriving compare, equal, hash, sexp, quickcheck]
 
-  (** Low-risk retail defaults: no PEP, no findings, standard countries, a
-      fiat account, up to 1k a month, face to face. *)
+  (** Low-risk retail defaults: no PEP, no findings, standard countries, a fiat account,
+      up to 1k a month, face to face. *)
   val baseline : t
 end
 
-(** EDD triggers that follow from the inputs on a date (PEP EDD ends at
-    [Pep.edd_until]). [Unusual_transaction] comes from monitoring, not from
-    here. *)
+(** EDD triggers that follow from the inputs on a date (PEP EDD ends at [Pep.edd_until]).
+    [Unusual_transaction] comes from monitoring, not from here. *)
 val edd_triggers : Inputs.t -> on:Date.t -> Edd_trigger.t list
 
 (** The triggers that force [High] whatever the score. *)
 val hard_floors : Inputs.t -> on:Date.t -> Edd_trigger.t list
 
 module Model : sig
-  (** Points per input value. Versioned: an assessment records the version
-      it was scored with, and a change of weights is a new version. *)
+  (** Points per input value. Versioned: an assessment records the version it was scored
+      with, and a change of weights is a new version. *)
   type t [@@deriving compare, equal, sexp]
 
   (** Our weights, version ["kyc-risk-2026-10"]. *)
@@ -263,8 +264,8 @@ module Assessment : sig
     end
   end
 
-  (** What was computed, kept as computed: replaying an old assessment never
-      rescored it with a newer model. *)
+  (** What was computed, kept as computed: replaying an old assessment never rescored it
+      with a newer model. *)
   type t = Stable.V1.t =
     { inputs : Inputs.t
     ; model_version : string
@@ -279,9 +280,9 @@ module Assessment : sig
   (** The override's band if any, else [computed_band]. *)
   val band : t -> Band.t
 
-  (** Internal consistency of a recorded assessment: score in 0-100,
-      [computed_band] matches the score and the floors, and any override has
-      a reason and respects the floors. *)
+  (** Internal consistency of a recorded assessment: score in 0-100, [computed_band]
+      matches the score and the floors, and any override has a reason and respects the
+      floors. *)
   val validate : t -> unit Or_error.t
 end
 

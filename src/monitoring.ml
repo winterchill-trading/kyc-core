@@ -5,7 +5,8 @@ module Alert_id =
   (val String_id.make
          ~module_name:"Kyc_core.Monitoring.Alert_id"
          ~include_default_validation:true
-         ~caller_identity:(Bin_prot.Shape.Uuid.of_string "8f3d2c71-6a0e-4b9e-9d2a-51c7e4b0a6f3")
+         ~caller_identity:
+           (Bin_prot.Shape.Uuid.of_string "8f3d2c71-6a0e-4b9e-9d2a-51c7e4b0a6f3")
          ())
 
 module Source = struct

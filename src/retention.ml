@@ -45,7 +45,9 @@ let check_hold (h : Legal_hold.t) ~base =
     | None -> Ok ()
     | Some b when Time_ns.( <= ) h.until b ->
       Or_error.error_s
-        [%message "a legal hold must end after the retention date" ~retention_ends:(b : Timestamp.t)]
+        [%message
+          "a legal hold must end after the retention date"
+            ~retention_ends:(b : Timestamp.t)]
     | Some b when Time_ns.( > ) h.until (Time_ns.add b max_hold_extension) ->
       Or_error.error_s
         [%message

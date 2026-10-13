@@ -141,7 +141,8 @@ let create ~id ~reason ~screened_at ~hits =
       String.compare a.entry_id b.entry_id)
   with
   | Some hit ->
-    Or_error.error_s [%message "duplicate hit in screening" ~entry_id:(hit.entry_id : string)]
+    Or_error.error_s
+      [%message "duplicate hit in screening" ~entry_id:(hit.entry_id : string)]
   | None ->
     Ok { id; reason; screened_at; hits = List.map hits ~f:(fun h -> h, Hit_state.Open) }
 ;;
@@ -161,11 +162,13 @@ let next (state : Hit_state.t) (action : Review_action.t) ~(by : Operator_id.t) 
   let open Or_error.Let_syntax in
   let illegal () =
     Or_error.error_s
-      [%message "illegal hit review" ~state:(state : Hit_state.t) (action : Review_action.t)]
+      [%message
+        "illegal hit review" ~state:(state : Hit_state.t) (action : Review_action.t)]
   in
   match state, action with
   | (Discounted _ | Confirmed _), _ -> illegal ()
-  | (Open | Escalated _), Take -> Ok (Hit_state.Under_review { by; discount_proposal = None })
+  | (Open | Escalated _), Take ->
+    Ok (Hit_state.Under_review { by; discount_proposal = None })
   | (Open | Under_review _ | Escalated _), Propose_discount reason ->
     let%map () = non_empty "discount" reason in
     Hit_state.Under_review { by; discount_proposal = Some reason }
@@ -173,7 +176,8 @@ let next (state : Hit_state.t) (action : Review_action.t) ~(by : Operator_id.t) 
     if Operator_id.equal proposer by
     then
       Or_error.error_s
-        [%message "discounting needs a second operator" ~proposed_by:(proposer : Operator_id.t)]
+        [%message
+          "discounting needs a second operator" ~proposed_by:(proposer : Operator_id.t)]
     else Ok (Hit_state.Discounted { reason; proposed_by = proposer; confirmed_by = by })
   | (Open | Under_review _ | Escalated _), Confirm reason ->
     let%map () = non_empty "confirmation" reason in

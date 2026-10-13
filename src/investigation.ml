@@ -5,14 +5,16 @@ module Investigation_id =
   (val String_id.make
          ~module_name:"Kyc_core.Investigation.Investigation_id"
          ~include_default_validation:true
-         ~caller_identity:(Bin_prot.Shape.Uuid.of_string "2b6f9c3e-0d4a-4f8b-a1e7-6c5d3f9b8e21")
+         ~caller_identity:
+           (Bin_prot.Shape.Uuid.of_string "2b6f9c3e-0d4a-4f8b-a1e7-6c5d3f9b8e21")
          ())
 
 module Request_id =
   (val String_id.make
          ~module_name:"Kyc_core.Investigation.Request_id"
          ~include_default_validation:true
-         ~caller_identity:(Bin_prot.Shape.Uuid.of_string "c4e1a7d2-9b3f-4e6a-8d0c-1f2e3a4b5c6d")
+         ~caller_identity:
+           (Bin_prot.Shape.Uuid.of_string "c4e1a7d2-9b3f-4e6a-8d0c-1f2e3a4b5c6d")
          ())
 
 module Case_state = struct
@@ -118,7 +120,9 @@ let report t (to_ : Report_state.t) ~by =
     | None, Draft -> Ok { t with report = Some (Draft, by) }
     | Some (Draft, drafter), Approved ->
       if Operator_id.equal drafter by
-      then Or_error.error_s [%message "a report is approved by someone other than its drafter"]
+      then
+        Or_error.error_s
+          [%message "a report is approved by someone other than its drafter"]
       else Ok { t with report = Some (Approved, drafter) }
     | Some (Approved, drafter), Filed -> Ok { t with report = Some (Filed, drafter) }
     | Some (Filed, drafter), ((Acknowledged _ | Rejected_by_fiu _) as s) ->

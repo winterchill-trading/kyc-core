@@ -1,18 +1,16 @@
-(** A customer's due-diligence case: the aggregate that events are applied
-    to. It covers customer due diligence (identity steps, tier), the
-    risk-based rating and CDD level, enhanced due diligence (EDD),
-    screening with four-eyes discounting, ongoing monitoring, investigations
-    and FIU reporting, periodic review, and record retention.
+(** A customer's due-diligence case: the aggregate that events are applied to. It covers
+    customer due diligence (identity steps, tier), the risk-based rating and CDD level,
+    enhanced due diligence (EDD), screening with four-eyes discounting, ongoing
+    monitoring, investigations and FIU reporting, periodic review, and record retention.
 
     The case is derived state. Persist the {!Event.t} stream and rebuild with
     {!of_events}; that is why this type has no [Stable] module.
 
-    [apply] never raises. An illegal event returns an error and leaves the
-    case unchanged (the event is not recorded as applied, so the same event
-    keeps failing the same way). An event whose id was already applied is a
-    no-op; the same id with different content is an error. Every applied
-    event adds at least one {!Audit} entry with its actor, time and note; a
-    confirmed sanctions hit adds a second one for the automatic block. *)
+    [apply] never raises. An illegal event returns an error and leaves the case unchanged
+    (the event is not recorded as applied, so the same event keeps failing the same way).
+    An event whose id was already applied is a no-op; the same id with different content
+    is an error. Every applied event adds at least one {!Audit} entry with its actor, time
+    and note; a confirmed sanctions hit adds a second one for the automatic block. *)
 
 open! Core
 
@@ -41,17 +39,16 @@ module Policy : sig
     }
   [@@deriving compare, equal, sexp]
 
-  (** Default rules; approval at [T2], EDD at [T3] with senior approval;
-      screening and a risk band required; simplified DD allowed; reviews
-      every 5 / 3 / 1 years for Low / Medium / High (AMLR Art. 26 caps are 5
-      and 1); retention 5 years (FATF R.11, AMLR Art. 77). Years are 365
-      days. *)
+  (** Default rules; approval at [T2], EDD at [T3] with senior approval; screening and a
+      risk band required; simplified DD allowed; reviews every 5 / 3 / 1 years for Low /
+      Medium / High (AMLR Art. 26 caps are 5 and 1); retention 5 years (FATF R.11, AMLR
+      Art. 77). Years are 365 days. *)
   val default : t
 end
 
 module Follow_up : sig
-  (** Work the case needs now, for schedulers and operator queues. Most of
-      it is restricted information; see {!Visibility}. *)
+  (** Work the case needs now, for schedulers and operator queues. Most of it is
+      restricted information; see {!Visibility}. *)
   type t =
     | Risk_assessment_needed (** none yet, or screening found what the inputs miss *)
     | Edd_outstanding of
@@ -71,9 +68,9 @@ module Follow_up : sig
 end
 
 module Customer_view : sig
-  (** What the customer (and customer-facing APIs) may be shown. It carries
-      no risk band, screening, alert, investigation or report information:
-      a blocked case shows [Under_review] and nothing else (tipping-off). *)
+  (** What the customer (and customer-facing APIs) may be shown. It carries no risk band,
+      screening, alert, investigation or report information: a blocked case shows
+      [Under_review] and nothing else (tipping-off). *)
 
   type status =
     | In_progress
@@ -126,9 +123,9 @@ val band : t -> Risk.Band.t option
 (** The tier the verified steps reach, whatever the status. *)
 val verified_tier : t -> Tier.t
 
-(** The tier the customer may use now: [T0] when rejected, blocked or
-    closed, the verified tier when approved, and at most [T1] while the case
-    is open (contact details need no review, identity does). *)
+(** The tier the customer may use now: [T0] when rejected, blocked or closed, the verified
+    tier when approved, and at most [T1] while the case is open (contact details need no
+    review, identity does). *)
 val tier : t -> Tier.t
 
 val required_for : t -> Tier.t -> Verification.Step.Set.t
@@ -137,14 +134,13 @@ val missing_for : t -> Tier.t -> Verification.Step.Set.t
 (** Missing steps for the next tier above {!verified_tier}. *)
 val missing_steps : t -> Verification.Step.Set.t
 
-(** EDD triggers on a date: from the latest risk inputs (PEP within its EDD
-    period, high-risk third country, self-hosted exposure, confirmed adverse
-    media, manual reasons) plus [Unusual_transaction] while a
-    transaction-monitoring alert is escalated. *)
+(** EDD triggers on a date: from the latest risk inputs (PEP within its EDD period,
+    high-risk third country, self-hosted exposure, confirmed adverse media, manual
+    reasons) plus [Unusual_transaction] while a transaction-monitoring alert is escalated. *)
 val edd_triggers : t -> now:Timestamp.t -> Risk.Edd_trigger.t list
 
-(** [Enhanced] for any trigger or a [High] band; see {!Cdd_level.decide}.
-    [Standard] before any assessment. *)
+(** [Enhanced] for any trigger or a [High] band; see {!Cdd_level.decide}. [Standard]
+    before any assessment. *)
 val cdd_level : t -> now:Timestamp.t -> Cdd_level.t
 
 (** Why [Approve] would fail at [now] (status aside), or [Ok ()]. *)
@@ -153,8 +149,8 @@ val can_approve : t -> now:Timestamp.t -> unit Or_error.t
 (** Last approval or completed periodic review. *)
 val last_review_at : t -> Timestamp.t option
 
-(** [last_review_at] plus the interval for the current band, while the case
-    is approved and rated; a band change moves it. *)
+(** [last_review_at] plus the interval for the current band, while the case is approved
+    and rated; a band change moves it. *)
 val next_review_due : t -> Timestamp.t option
 
 val closed_at : t -> Timestamp.t option

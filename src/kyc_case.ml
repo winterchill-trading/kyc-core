@@ -34,9 +34,9 @@ module Policy = struct
     }
   [@@deriving compare, equal, sexp]
 
-  (* Calendar years would need a zone and leap-day rules; 365-day years are
-     slightly early, which is the safe side for reviews and close enough for
-     retention given that erasure is a separate, audited job. *)
+  (* Calendar years would need a zone and leap-day rules; 365-day years are slightly
+     early, which is the safe side for reviews and close enough for retention given that
+     erasure is a separate, audited job. *)
   let years n = Time_ns.Span.of_day (Float.of_int (365 * n))
 
   let default =
@@ -187,8 +187,7 @@ let cdd_level t ~now =
       ~allow_simplified:t.policy.allow_simplified
 ;;
 
-(* A sign-off covers the assessment it was given for; a new assessment needs
-   a new one. *)
+(* A sign-off covers the assessment it was given for; a new assessment needs a new one. *)
 let senior_approval_current t =
   match t.senior_approval_at, t.risk with
   | Some approved, Some r -> Time_ns.( >= ) approved r.computed_at
@@ -242,7 +241,8 @@ let can_approve t ~now =
 let next_review_due t =
   match t.status, t.last_review_at, band t with
   | Approved, Some last, Some band ->
-    Some (Time_ns.add last (Policy.Review_intervals.for_band t.policy.review_intervals band))
+    Some
+      (Time_ns.add last (Policy.Review_intervals.for_band t.policy.review_intervals band))
   | _ -> None
 ;;
 
@@ -373,27 +373,31 @@ let need_operator (actor : Actor.t) ~what =
   match actor with
   | Operator id -> Ok id
   | System | Provider _ ->
-    Or_error.error_s [%message "only an operator may do this" (what : string) (actor : Actor.t)]
+    Or_error.error_s
+      [%message "only an operator may do this" (what : string) (actor : Actor.t)]
 ;;
 
 let find map key ~what ~sexp_of_key =
   match Map.find map key with
   | Some v -> Ok v
-  | None -> Or_error.error_s [%message "unknown" (what : string) ~id:(sexp_of_key key : Sexp.t)]
+  | None ->
+    Or_error.error_s [%message "unknown" (what : string) ~id:(sexp_of_key key : Sexp.t)]
 ;;
 
 (* The new case and the audit changes for an event not seen before. *)
 let step_event t (event : Event.t) : (t * Audit.Change.t list) Or_error.t =
   let open Or_error.Let_syntax in
   let one (t, change) = t, [ change ] in
-  let closed () = Or_error.error_s [%message "case is closed" ~status:(t.status : Status.t)] in
+  let closed () =
+    Or_error.error_s [%message "case is closed" ~status:(t.status : Status.t)]
+  in
   match event.kind, t.person, t.status with
   | Opened person, None, _ -> Ok ({ t with person = Some person }, [ Audit.Change.Opened ])
   | Opened _, Some _, _ -> Or_error.error_s [%message "case already opened"]
   | _, None, _ -> Or_error.error_s [%message "case not opened yet"]
   | Status_changed transition, Some _, _ ->
-    (* Status first, so an approval of a rejected case reports the status,
-       not missing steps. *)
+    (* Status first, so an approval of a rejected case reports the status, not missing
+       steps. *)
     let%bind to_ = Status.apply t.status transition ~actor:event.actor in
     let%map () =
       match transition with
@@ -412,8 +416,12 @@ let step_event t (event : Event.t) : (t * Audit.Change.t list) Or_error.t =
     let%bind screening =
       find t.screenings screening_id ~what:"screening" ~sexp_of_key:Screening_id.sexp_of_t
     in
-    let%map reviewed, state = Screening.review screening ~entry_id ~action ~actor:event.actor in
-    let t = { t with screenings = Map.set t.screenings ~key:screening_id ~data:reviewed } in
+    let%map reviewed, state =
+      Screening.review screening ~entry_id ~action ~actor:event.actor
+    in
+    let t =
+      { t with screenings = Map.set t.screenings ~key:screening_id ~data:reviewed }
+    in
     let change = Audit.Change.Hit_reviewed { screening_id; entry_id; action } in
     let sanctions_confirmed =
       match state with
@@ -422,17 +430,22 @@ let step_event t (event : Event.t) : (t * Audit.Change.t list) Or_error.t =
           String.equal h.entry_id entry_id && Screening.List_source.is_sanctions h.source)
       | Open | Under_review _ | Discounted _ | Escalated _ -> false
     in
-    (* A confirmed sanctions match blocks the customer at once (FATF R.6:
-       freeze without delay). The reviewer is the actor of the block. *)
+    (* A confirmed sanctions match blocks the customer at once (FATF R.6: freeze without
+       delay). The reviewer is the actor of the block. *)
     (match sanctions_confirmed, t.status with
-     | true, ((Created | Verifying | Approved | Rejected _ | Needs_resubmission _) as from)
+     | ( true
+       , ((Created | Verifying | Approved | Rejected _ | Needs_resubmission _) as from) )
        ->
-       let to_ = Status.Blocked { reason = "confirmed sanctions match"; previous = from } in
+       let to_ =
+         Status.Blocked { reason = "confirmed sanctions match"; previous = from }
+       in
        { t with status = to_ }, [ change; Audit.Change.Status { from; to_ } ]
      | true, (Blocked _ | Closed _) | false, _ -> t, [ change ])
   | Alert_decided { alert_id; decision }, Some _, _ ->
     let%bind by = need_operator event.actor ~what:"decide an alert" in
-    let%bind alert = find t.alerts alert_id ~what:"alert" ~sexp_of_key:Alert_id.sexp_of_t in
+    let%bind alert =
+      find t.alerts alert_id ~what:"alert" ~sexp_of_key:Alert_id.sexp_of_t
+    in
     let%map alert = Monitoring.Alert.decide alert decision ~by ~at:event.at in
     one
       ( { t with alerts = Map.set t.alerts ~key:alert_id ~data:alert }
@@ -450,7 +463,8 @@ let step_event t (event : Event.t) : (t * Audit.Change.t list) Or_error.t =
         match a.state with
         | Escalated _ -> Ok ()
         | Open | Closed_no_action _ ->
-          Or_error.error_s [%message "only escalated alerts are investigated" (id : Alert_id.t)])
+          Or_error.error_s
+            [%message "only escalated alerts are investigated" (id : Alert_id.t)])
       |> Or_error.combine_errors_unit
     in
     let i = Investigation.open_ ~id:investigation_id ~at:event.at ~alerts:ids in
@@ -460,7 +474,10 @@ let step_event t (event : Event.t) : (t * Audit.Change.t list) Or_error.t =
   | Investigation_moved { investigation_id; state }, Some _, _ ->
     let%bind _ = need_operator event.actor ~what:"move an investigation" in
     let%bind i =
-      find t.investigations investigation_id ~what:"investigation"
+      find
+        t.investigations
+        investigation_id
+        ~what:"investigation"
         ~sexp_of_key:Investigation_id.sexp_of_t
     in
     let%map i = Investigation.move i state in
@@ -470,7 +487,10 @@ let step_event t (event : Event.t) : (t * Audit.Change.t list) Or_error.t =
   | Report_changed { investigation_id; state }, Some _, _ ->
     let%bind by = need_operator event.actor ~what:"change a report" in
     let%bind i =
-      find t.investigations investigation_id ~what:"investigation"
+      find
+        t.investigations
+        investigation_id
+        ~what:"investigation"
         ~sexp_of_key:Investigation_id.sexp_of_t
     in
     let%map i = Investigation.report i state ~by in
@@ -509,8 +529,8 @@ let step_event t (event : Event.t) : (t * Audit.Change.t list) Or_error.t =
     (match t.legal_hold with
      | None -> Or_error.error_s [%message "no legal hold"]
      | Some _ -> Ok (one ({ t with legal_hold = None }, Audit.Change.Legal_hold_released)))
-  (* Monitoring, reporting and retention continue after closure (above);
-     everything else is frozen for the retention period. *)
+  (* Monitoring, reporting and retention continue after closure (above); everything else
+     is frozen for the retention period. *)
   | ( ( Person_updated _
       | Step_changed _
       | Screened _
@@ -581,7 +601,9 @@ let step_event t (event : Event.t) : (t * Audit.Change.t list) Or_error.t =
     in
     (match cdd_level t ~now:event.at with
      | Enhanced ->
-       Ok (one ({ t with senior_approval_at = Some event.at }, Audit.Change.Senior_approval))
+       Ok
+         (one
+            ({ t with senior_approval_at = Some event.at }, Audit.Change.Senior_approval))
      | Simplified | Standard ->
        Or_error.error_s [%message "no enhanced due diligence applies"])
   | Periodic_review_completed, Some _, _ ->
@@ -597,13 +619,15 @@ let step_event t (event : Event.t) : (t * Audit.Change.t list) Or_error.t =
       match t.risk, t.last_review_at with
       | Some r, Some last when Time_ns.( >= ) r.computed_at last -> Ok ()
       | _ ->
-        Or_error.error_s [%message "a review needs a risk assessment since the last review"]
+        Or_error.error_s
+          [%message "a review needs a risk assessment since the last review"]
     in
     let%map () =
       match edd_outstanding t ~now:event.at with
       | None -> Ok ()
       | Some edd ->
-        Or_error.error_s [%message "enhanced due diligence outstanding" (edd : Follow_up.t)]
+        Or_error.error_s
+          [%message "enhanced due diligence outstanding" (edd : Follow_up.t)]
     in
     one ({ t with last_review_at = Some event.at }, Audit.Change.Periodic_review_completed)
   | Alert_raised { alert_id; source; severity; summary }, Some _, _ ->

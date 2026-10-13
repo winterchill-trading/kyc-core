@@ -1,7 +1,7 @@
 (** Sanctions, PEP and adverse-media screening records.
 
-    A screening run has a reason and a list of candidate hits; each hit is
-    reviewed on its own:
+    A screening run has a reason and a list of candidate hits; each hit is reviewed on its
+    own:
 
     {v
       Open | Escalated ------ Take ------------> Under_review
@@ -14,10 +14,9 @@
       Open | Under_review --- Escalate ---------> Escalated
     v}
 
-    Discounting needs two different operators (four eyes). [Discounted] and
-    [Confirmed] are final. A screening blocks approval until every hit is
-    discounted; a confirmed sanctions hit also blocks the customer (see
-    {!Kyc_case}). *)
+    Discounting needs two different operators (four eyes). [Discounted] and [Confirmed]
+    are final. A screening blocks approval until every hit is discounted; a confirmed
+    sanctions hit also blocks the customer (see {!Kyc_case}). *)
 
 open! Core
 

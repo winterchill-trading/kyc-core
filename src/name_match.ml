@@ -1,7 +1,7 @@
 open! Core
 
-(* Base letters for the Latin-1 Supplement and Latin Extended-A letters that
-   occur in European names. *)
+(* Base letters for the Latin-1 Supplement and Latin Extended-A letters that occur in
+   European names. *)
 let folds =
   [ "àáâãäåāăą", "a"
   ; "çćĉċč", "c"
@@ -46,8 +46,8 @@ let fold_table =
   List.iter folds ~f:(fun (letters, base) ->
     List.iter (uchars letters) ~f:(fun u ->
       Hashtbl.set table ~key:(Uchar.to_scalar u) ~data:base;
-      (* Upper-case forms sit 32 code points below in Latin-1 (À = à - 32)
-         and one below in Latin Extended-A (Ā = ā - 1). *)
+      (* Upper-case forms sit 32 code points below in Latin-1 (À = à - 32) and one below
+         in Latin Extended-A (Ā = ā - 1). *)
       let code = Uchar.to_scalar u in
       let upper = if code < 0x100 then code - 32 else code - 1 in
       if not (Hashtbl.mem table upper) then Hashtbl.set table ~key:upper ~data:base));
@@ -56,9 +56,36 @@ let fold_table =
 
 let stopwords =
   String.Set.of_list
-    [ "mr"; "mrs"; "ms"; "miss"; "dr"; "prof"; "sir"; "dame"; "herr"; "frau"
-    ; "ltd"; "llc"; "inc"; "plc"; "gmbh"; "ag"; "sa"; "sas"; "sarl"; "srl"; "spa"; "bv"
-    ; "nv"; "oy"; "ab"; "as"; "co"; "corp"; "limited"; "company"
+    [ "mr"
+    ; "mrs"
+    ; "ms"
+    ; "miss"
+    ; "dr"
+    ; "prof"
+    ; "sir"
+    ; "dame"
+    ; "herr"
+    ; "frau"
+    ; "ltd"
+    ; "llc"
+    ; "inc"
+    ; "plc"
+    ; "gmbh"
+    ; "ag"
+    ; "sa"
+    ; "sas"
+    ; "sarl"
+    ; "srl"
+    ; "spa"
+    ; "bv"
+    ; "nv"
+    ; "oy"
+    ; "ab"
+    ; "as"
+    ; "co"
+    ; "corp"
+    ; "limited"
+    ; "company"
     ]
 ;;
 
@@ -69,7 +96,9 @@ let tokens name =
     if code < 128
     then (
       let c = Char.of_int_exn code in
-      if Char.is_alphanum c then Buffer.add_char buf (Char.lowercase c) else Buffer.add_char buf ' ')
+      if Char.is_alphanum c
+      then Buffer.add_char buf (Char.lowercase c)
+      else Buffer.add_char buf ' ')
     else (
       match Hashtbl.find fold_table code with
       | Some base -> Buffer.add_string buf base
@@ -129,14 +158,18 @@ let jaro a b =
           incr k)
       done;
       let m = Float.of_int !matches in
-      ((m /. Float.of_int la) +. (m /. Float.of_int lb) +. ((m -. (Float.of_int !transpositions /. 2.)) /. m))
+      ((m /. Float.of_int la)
+       +. (m /. Float.of_int lb)
+       +. ((m -. (Float.of_int !transpositions /. 2.)) /. m))
       /. 3.))
 ;;
 
 let jaro_winkler a b =
   let j = jaro a b in
   let max_prefix = Int.min 4 (Int.min (String.length a) (String.length b)) in
-  let rec prefix i = if i < max_prefix && Char.equal a.[i] b.[i] then prefix (i + 1) else i in
+  let rec prefix i =
+    if i < max_prefix && Char.equal a.[i] b.[i] then prefix (i + 1) else i
+  in
   j +. (Float.of_int (prefix 0) *. 0.1 *. (1. -. j))
 ;;
 
@@ -150,5 +183,4 @@ let score a b =
 ;;
 
 let default_threshold = 0.85
-
 let is_candidate ?(threshold = default_threshold) a b = Float.( >= ) (score a b) threshold

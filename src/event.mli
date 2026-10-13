@@ -1,8 +1,8 @@
-(** Something that happened to a case. Events are the persisted record (bin_io
-    via [Stable]); a {!Kyc_case} is rebuilt by applying them in order.
+(** Something that happened to a case. Events are the persisted record (bin_io via
+    [Stable]); a {!Kyc_case} is rebuilt by applying them in order.
 
-    [id] makes application idempotent: for provider events use the
-    provider's event or delivery id, so a redelivered webhook is a no-op. *)
+    [id] makes application idempotent: for provider events use the provider's event or
+    delivery id, so a redelivered webhook is a no-op. *)
 
 open! Core
 
@@ -84,8 +84,10 @@ module Kind : sig
         ; entry_id : string
         ; action : Screening.Review_action.t
         }
-    | Risk_assessed of Risk.Assessment.t (** as computed by [Risk.assess] (and [Risk.override]) *)
-    | Senior_approval (** EDD sign-off by senior management (FATF R.12); the note is the rationale *)
+    | Risk_assessed of Risk.Assessment.t
+    (** as computed by [Risk.assess] (and [Risk.override]) *)
+    | Senior_approval
+    (** EDD sign-off by senior management (FATF R.12); the note is the rationale *)
     | Periodic_review_completed (** needs a risk assessment since the last review *)
     | Alert_raised of
         { alert_id : Monitoring.Alert_id.t

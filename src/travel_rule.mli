@@ -1,9 +1,8 @@
-(** Travel-rule data for crypto-asset transfers (EU TFR 2023/1113 Art. 14;
-    FATF R.16 via R.15). Between providers there is no threshold: every
-    transfer carries originator and beneficiary data. For a self-hosted
-    address above EUR 1 000 the provider must assess that the customer owns
-    or controls it (Art. 14(5) outgoing, Art. 16(2) incoming). Records are
-    kept 5 years (Art. 26). *)
+(** Travel-rule data for crypto-asset transfers (EU TFR 2023/1113 Art. 14; FATF R.16 via
+    R.15). Between providers there is no threshold: every transfer carries originator and
+    beneficiary data. For a self-hosted address above EUR 1 000 the provider must assess
+    that the customer owns or controls it (Art. 14(5) outgoing, Art. 16(2) incoming).
+    Records are kept 5 years (Art. 26). *)
 
 open! Core
 
@@ -99,10 +98,9 @@ type t = Stable.V1.t =
   }
 [@@deriving compare, equal, hash, sexp]
 
-(** Names of required fields that are missing: originator name, a DLT
-    address or account number, and either (address, official document
-    number and customer number) or date and place of birth; beneficiary name
-    and a DLT address or account number. *)
+(** Names of required fields that are missing: originator name, a DLT address or account
+    number, and either (address, official document number and customer number) or date and
+    place of birth; beneficiary name and a DLT address or account number. *)
 val missing : t -> string list
 
 (** EUR 1 000.00 in cents. *)

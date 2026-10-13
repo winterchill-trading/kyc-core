@@ -18,9 +18,9 @@ type t = Stable.V1.t =
   | Enhanced
 [@@deriving compare, equal, hash, sexp, quickcheck, enumerate]
 
-(** [Enhanced] when any EDD trigger applies or the band is [High];
-    [Simplified] only for a [Low] band, when the policy allows it, and never
-    for crypto or Lightning products; otherwise [Standard]. *)
+(** [Enhanced] when any EDD trigger applies or the band is [High]; [Simplified] only for a
+    [Low] band, when the policy allows it, and never for crypto or Lightning products;
+    otherwise [Standard]. *)
 val decide
   :  band:Risk.Band.t
   -> triggers:Risk.Edd_trigger.t list

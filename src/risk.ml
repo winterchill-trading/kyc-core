@@ -19,7 +19,9 @@ module Band = struct
 
   include Comparable.Make (Stable.V1)
 
-  let of_score score = if Int.(score >= 60) then High else if Int.(score >= 30) then Medium else Low
+  let of_score score =
+    if Int.(score >= 60) then High else if Int.(score >= 30) then Medium else Low
+  ;;
 end
 
 module Country_risk = struct
@@ -243,8 +245,8 @@ module Model = struct
     }
   [@@deriving compare, equal, sexp]
 
-  (* Our weights. Any single hard-floor factor is worth 40, so it reaches
-     Medium on points alone; the floor then lifts it to High. *)
+  (* Our weights. Any single hard-floor factor is worth 40, so it reaches Medium on points
+     alone; the floor then lifts it to High. *)
   let default =
     { version = "kyc-risk-2026-10"
     ; sector = [ Low, 0; Medium, 15; High, 30 ]
@@ -253,7 +255,8 @@ module Model = struct
     ; pep = 40
     ; product = [ Fiat_account, 0; Card, 5; Crypto, 20; Lightning, 20 ]
     ; volume = [ Up_to_1k, 0; Up_to_10k, 5; Up_to_100k, 15; Above_100k, 25 ]
-    ; channel = [ Face_to_face, 0; Eid_high, 0; Remote_attended, 5; Remote_unattended, 10 ]
+    ; channel =
+        [ Face_to_face, 0; Eid_high, 0; Remote_attended, 5; Remote_unattended, 10 ]
     ; self_hosted = 15
     }
   ;;
@@ -261,18 +264,20 @@ module Model = struct
   let version t = t.version
 
   let points t (i : Inputs.t) ~on =
-    let find table key ~equal = List.Assoc.find table key ~equal |> Option.value ~default:0 in
+    let find table key ~equal =
+      List.Assoc.find table key ~equal |> Option.value ~default:0
+    in
     let worst table keys ~equal =
       List.fold keys ~init:0 ~f:(fun acc k -> Int.max acc (find table k ~equal))
     in
     [ "sector", find t.sector i.sector ~equal:Band.equal
     ; "country", worst t.country [ i.residence; i.nationality ] ~equal:Country_risk.equal
     ; "adverse_media", find t.adverse_media i.adverse_media ~equal:Adverse_media.equal
-    ; "pep", (if Option.is_some (pep_trigger i ~on) then t.pep else 0)
+    ; ("pep", if Option.is_some (pep_trigger i ~on) then t.pep else 0)
     ; "product", worst t.product i.products ~equal:Product.equal
     ; "volume", find t.volume i.monthly_volume ~equal:Volume_band.equal
     ; "channel", find t.channel i.channel ~equal:Channel.equal
-    ; "self_hosted", (if i.self_hosted_exposure then t.self_hosted else 0)
+    ; ("self_hosted", if i.self_hosted_exposure then t.self_hosted else 0)
     ]
   ;;
 

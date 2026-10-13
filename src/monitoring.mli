@@ -1,14 +1,13 @@
-(** Ongoing monitoring (FATF R.10 ongoing due diligence; AMLR Art. 26):
-    alerts raised by transaction monitoring, re-screening, adverse media,
-    document expiry or an overdue review.
+(** Ongoing monitoring (FATF R.10 ongoing due diligence; AMLR Art. 26): alerts raised by
+    transaction monitoring, re-screening, adverse media, document expiry or an overdue
+    review.
 
     {v Open -> Closed_no_action | Escalated;  Escalated -> Closed_no_action v}
 
-    An escalated alert goes to an {!Investigation}. Alerts are restricted
-    information (tipping-off, FATF R.21): see {!Visibility}. *)
+    An escalated alert goes to an {!Investigation}. Alerts are restricted information
+    (tipping-off, FATF R.21): see {!Visibility}. *)
 
 open! Core
-
 module Alert_id : String_id.S
 
 module Source : sig
