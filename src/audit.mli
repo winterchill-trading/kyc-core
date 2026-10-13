@@ -1,6 +1,8 @@
-(** The audit trail of a case: one entry per change an event caused, with who, when and
-    why. Entries hold no PII: a person update records which fields changed, never their
-    values. *)
+(** The audit trail of a case: one entry per change an event caused, with
+    who, when and why. Entries hold no PII: a person update records which
+    fields changed, never their values. Each change has a
+    {!Visibility.Class.t}; {!for_audience} filters the trail so that, for
+    example, a customer never sees monitoring or reporting entries. *)
 
 open! Core
 
@@ -21,26 +23,48 @@ module Change : sig
             }
         | Screened of
             { screening_id : Screening_id.Stable.V1.t
+            ; reason : Screening.Screen_reason.Stable.V1.t
             ; hits : int
             }
-        | Screening_reviewed of
+        | Hit_reviewed of
             { screening_id : Screening_id.Stable.V1.t
-            ; decision : Screening.Decision.Stable.V1.t
+            ; entry_id : string
+            ; action : Screening.Review_action.Stable.V1.t
             }
         | Risk_assessed of
-            { computed : Risk.Level.Stable.V1.t
-            ; rating : Risk.Level.Stable.V1.t
+            { score : int
+            ; computed_band : Risk.Band.Stable.V1.t
+            ; band : Risk.Band.Stable.V1.t
+            ; model_version : string
             }
         | Senior_approval
         | Periodic_review_completed
         | Alert_raised of
             { alert_id : Monitoring.Alert_id.Stable.V1.t
-            ; severity : Risk.Level.Stable.V1.t
+            ; severity : Risk.Band.Stable.V1.t
             }
-        | Alert_closed of
+        | Alert_decided of
             { alert_id : Monitoring.Alert_id.Stable.V1.t
-            ; resolution : Monitoring.Resolution.Stable.V1.t
+            ; decision : Monitoring.Decision.Stable.V1.t
             }
+        | Investigation_opened of Investigation.Investigation_id.Stable.V1.t
+        | Investigation_moved of
+            { investigation_id : Investigation.Investigation_id.Stable.V1.t
+            ; state : Investigation.Case_state.Stable.V1.t
+            }
+        | Report_changed of
+            { investigation_id : Investigation.Investigation_id.Stable.V1.t
+            ; state : Investigation.Report_state.Stable.V1.t
+            }
+        | Fiu_request_received of
+            { request_id : Investigation.Request_id.Stable.V1.t
+            ; due : Date.Stable.V1.t
+            }
+        | Fiu_request_answered of Investigation.Request_id.Stable.V1.t
+        | Legal_hold_set of
+            { until : Timestamp.Stable.V1.t
+            }
+        | Legal_hold_released
       [@@deriving bin_io, compare, equal, hash, sexp]
     end
   end
@@ -59,27 +83,51 @@ module Change : sig
         }
     | Screened of
         { screening_id : Screening_id.t
+        ; reason : Screening.Screen_reason.t
         ; hits : int
         }
-    | Screening_reviewed of
+    | Hit_reviewed of
         { screening_id : Screening_id.t
-        ; decision : Screening.Decision.t
+        ; entry_id : string
+        ; action : Screening.Review_action.t
         }
     | Risk_assessed of
-        { computed : Risk.Level.t
-        ; rating : Risk.Level.t
+        { score : int
+        ; computed_band : Risk.Band.t
+        ; band : Risk.Band.t
+        ; model_version : string
         }
     | Senior_approval
     | Periodic_review_completed
     | Alert_raised of
         { alert_id : Monitoring.Alert_id.t
-        ; severity : Risk.Level.t
+        ; severity : Risk.Band.t
         }
-    | Alert_closed of
+    | Alert_decided of
         { alert_id : Monitoring.Alert_id.t
-        ; resolution : Monitoring.Resolution.t
+        ; decision : Monitoring.Decision.t
         }
+    | Investigation_opened of Investigation.Investigation_id.t
+    | Investigation_moved of
+        { investigation_id : Investigation.Investigation_id.t
+        ; state : Investigation.Case_state.t
+        }
+    | Report_changed of
+        { investigation_id : Investigation.Investigation_id.t
+        ; state : Investigation.Report_state.t
+        }
+    | Fiu_request_received of
+        { request_id : Investigation.Request_id.t
+        ; due : Date.t
+        }
+    | Fiu_request_answered of Investigation.Request_id.t
+    | Legal_hold_set of
+        { until : Timestamp.t
+        }
+    | Legal_hold_released
   [@@deriving compare, equal, hash, sexp]
+
+  val visibility : t -> Visibility.Class.t
 end
 
 module Entry : sig
@@ -113,5 +161,8 @@ val add : t -> Entry.t -> t
 
 (** Oldest first. *)
 val entries : t -> Entry.t list
+
+(** Oldest first, only what the audience may see. *)
+val for_audience : t -> Visibility.Audience.t -> Entry.t list
 
 val length : t -> int

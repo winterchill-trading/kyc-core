@@ -13,28 +13,49 @@ module Kind = struct
         | Status_changed of Status.Transition.Stable.V1.t
         | Screened of
             { screening_id : Screening_id.Stable.V1.t
-            ; outcome : Screening.Outcome.Stable.V1.t
+            ; reason : Screening.Screen_reason.Stable.V1.t
+            ; hits : Screening.Hit.Stable.V1.t list
             }
-        | Screening_reviewed of
+        | Hit_reviewed of
             { screening_id : Screening_id.Stable.V1.t
-            ; decision : Screening.Decision.Stable.V1.t
+            ; entry_id : string
+            ; action : Screening.Review_action.Stable.V1.t
             }
-        | Risk_assessed of
-            { factors : Risk.Factors.Stable.V1.t
-            ; override : Risk.Override.Stable.V1.t option
-            }
+        | Risk_assessed of Risk.Assessment.Stable.V1.t
         | Senior_approval
         | Periodic_review_completed
         | Alert_raised of
             { alert_id : Monitoring.Alert_id.Stable.V1.t
             ; source : Monitoring.Source.Stable.V1.t
-            ; severity : Risk.Level.Stable.V1.t
+            ; severity : Risk.Band.Stable.V1.t
             ; summary : string
             }
-        | Alert_closed of
+        | Alert_decided of
             { alert_id : Monitoring.Alert_id.Stable.V1.t
-            ; resolution : Monitoring.Resolution.Stable.V1.t
+            ; decision : Monitoring.Decision.Stable.V1.t
             }
+        | Investigation_opened of
+            { investigation_id : Investigation.Investigation_id.Stable.V1.t
+            ; alerts : Monitoring.Alert_id.Stable.V1.t list
+            }
+        | Investigation_moved of
+            { investigation_id : Investigation.Investigation_id.Stable.V1.t
+            ; state : Investigation.Case_state.Stable.V1.t
+            }
+        | Report_changed of
+            { investigation_id : Investigation.Investigation_id.Stable.V1.t
+            ; state : Investigation.Report_state.Stable.V1.t
+            }
+        | Fiu_request_received of
+            { request_id : Investigation.Request_id.Stable.V1.t
+            ; received_on : Date.Stable.V1.t
+            }
+        | Fiu_request_answered of
+            { request_id : Investigation.Request_id.Stable.V1.t
+            ; answered_on : Date.Stable.V1.t
+            }
+        | Legal_hold_set of Retention.Legal_hold.Stable.V1.t
+        | Legal_hold_released
       [@@deriving bin_io, compare, equal, hash, sexp]
     end
   end
@@ -49,29 +70,50 @@ module Kind = struct
     | Status_changed of Status.Transition.t
     | Screened of
         { screening_id : Screening_id.t
-        ; outcome : Screening.Outcome.t
+        ; reason : Screening.Screen_reason.t
+        ; hits : Screening.Hit.t list
         }
-    | Screening_reviewed of
+    | Hit_reviewed of
         { screening_id : Screening_id.t
-        ; decision : Screening.Decision.t
+        ; entry_id : string
+        ; action : Screening.Review_action.t
         }
-    | Risk_assessed of
-        { factors : Risk.Factors.t
-        ; override : Risk.Override.t option
-        }
+    | Risk_assessed of Risk.Assessment.t
     | Senior_approval
     | Periodic_review_completed
     | Alert_raised of
         { alert_id : Monitoring.Alert_id.t
         ; source : Monitoring.Source.t
-        ; severity : Risk.Level.t
+        ; severity : Risk.Band.t
         ; summary : string
         }
-    | Alert_closed of
+    | Alert_decided of
         { alert_id : Monitoring.Alert_id.t
-        ; resolution : Monitoring.Resolution.t
+        ; decision : Monitoring.Decision.t
         }
-  [@@deriving compare, equal, hash, sexp, quickcheck]
+    | Investigation_opened of
+        { investigation_id : Investigation.Investigation_id.t
+        ; alerts : Monitoring.Alert_id.t list
+        }
+    | Investigation_moved of
+        { investigation_id : Investigation.Investigation_id.t
+        ; state : Investigation.Case_state.t
+        }
+    | Report_changed of
+        { investigation_id : Investigation.Investigation_id.t
+        ; state : Investigation.Report_state.t
+        }
+    | Fiu_request_received of
+        { request_id : Investigation.Request_id.t
+        ; received_on : Date.t
+        }
+    | Fiu_request_answered of
+        { request_id : Investigation.Request_id.t
+        ; answered_on : Date.t
+        }
+    | Legal_hold_set of Retention.Legal_hold.t
+    | Legal_hold_released
+  [@@deriving compare, equal, hash, sexp]
 end
 
 module Stable = struct
@@ -96,4 +138,4 @@ type t = Stable.V1.t =
   ; note : string option
   ; kind : Kind.t
   }
-[@@deriving compare, equal, hash, sexp, quickcheck]
+[@@deriving compare, equal, hash, sexp]
