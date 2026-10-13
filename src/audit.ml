@@ -55,9 +55,7 @@ module Change = struct
             ; due : Date.Stable.V1.t
             }
         | Fiu_request_answered of Investigation.Request_id.Stable.V1.t
-        | Legal_hold_set of
-            { until : Timestamp.Stable.V1.t
-            }
+        | Legal_hold_set of { until : Timestamp.Stable.V1.t }
         | Legal_hold_released
       [@@deriving bin_io, compare, equal, hash, sexp]
     end
@@ -115,20 +113,30 @@ module Change = struct
         ; due : Date.t
         }
     | Fiu_request_answered of Investigation.Request_id.t
-    | Legal_hold_set of
-        { until : Timestamp.t
-        }
+    | Legal_hold_set of { until : Timestamp.t }
     | Legal_hold_released
   [@@deriving compare, equal, hash, sexp]
 
   let visibility : t -> Visibility.Class.t = function
+    (* A block's reason can reveal a sanctions match or a report. *)
+    | Status { from = Blocked _; _ } | Status { to_ = Blocked _; _ } -> Restricted
     | Opened | Person_updated _ | Step _ | Status _ -> Public
-    | Screened _ | Hit_reviewed _ | Risk_assessed _ | Senior_approval
-    | Periodic_review_completed | Legal_hold_set _ | Legal_hold_released -> Internal
-    (* Tipping-off: monitoring and reporting never reach the customer or
-       customer-facing staff. *)
-    | Alert_raised _ | Alert_decided _ | Investigation_opened _ | Investigation_moved _
-    | Report_changed _ | Fiu_request_received _ | Fiu_request_answered _ -> Restricted
+    | Screened _
+    | Hit_reviewed _
+    | Risk_assessed _
+    | Senior_approval
+    | Periodic_review_completed
+    | Legal_hold_set _
+    | Legal_hold_released -> Internal
+    (* Tipping-off: monitoring and reporting never reach the customer or customer-facing
+       staff. *)
+    | Alert_raised _
+    | Alert_decided _
+    | Investigation_opened _
+    | Investigation_moved _
+    | Report_changed _
+    | Fiu_request_received _
+    | Fiu_request_answered _ -> Restricted
   ;;
 end
 
@@ -163,9 +171,15 @@ let empty = []
 let add t entry = entry :: t
 let entries t = List.rev t
 
-let for_audience t audience =
-  List.filter (entries t) ~f:(fun (e : Entry.t) ->
-    Visibility.can_see audience (Change.visibility e.change))
+let for_audience t (audience : Visibility.Audience.t) =
+  List.filter_map (entries t) ~f:(fun (e : Entry.t) ->
+    if not (Visibility.can_see audience (Change.visibility e.change))
+    then None
+    else (
+      match audience with
+      (* Staff notes are internal even on public changes. *)
+      | Customer -> Some { e with why = None }
+      | Support | Compliance -> Some e))
 ;;
 
 let length = List.length

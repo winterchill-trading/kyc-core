@@ -1,8 +1,7 @@
-(** The audit trail of a case: one entry per change an event caused, with
-    who, when and why. Entries hold no PII: a person update records which
-    fields changed, never their values. Each change has a
-    {!Visibility.Class.t}; {!for_audience} filters the trail so that, for
-    example, a customer never sees monitoring or reporting entries. *)
+(** The audit trail of a case: one entry per change an event caused, with who, when and
+    why. Entries hold no PII: a person update records which fields changed, never their
+    values. Each change has a {!Visibility.Class.t}; {!for_audience} filters the trail so
+    that, for example, a customer never sees monitoring or reporting entries. *)
 
 open! Core
 
@@ -61,9 +60,7 @@ module Change : sig
             ; due : Date.Stable.V1.t
             }
         | Fiu_request_answered of Investigation.Request_id.Stable.V1.t
-        | Legal_hold_set of
-            { until : Timestamp.Stable.V1.t
-            }
+        | Legal_hold_set of { until : Timestamp.Stable.V1.t }
         | Legal_hold_released
       [@@deriving bin_io, compare, equal, hash, sexp]
     end
@@ -121,9 +118,7 @@ module Change : sig
         ; due : Date.t
         }
     | Fiu_request_answered of Investigation.Request_id.t
-    | Legal_hold_set of
-        { until : Timestamp.t
-        }
+    | Legal_hold_set of { until : Timestamp.t }
     | Legal_hold_released
   [@@deriving compare, equal, hash, sexp]
 
@@ -162,7 +157,8 @@ val add : t -> Entry.t -> t
 (** Oldest first. *)
 val entries : t -> Entry.t list
 
-(** Oldest first, only what the audience may see. *)
+(** Oldest first, only what the audience may see; the customer's copy has no [why] notes,
+    and status changes into or out of [Blocked] are restricted. *)
 val for_audience : t -> Visibility.Audience.t -> Entry.t list
 
 val length : t -> int
