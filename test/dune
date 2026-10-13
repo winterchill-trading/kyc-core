@@ -13,7 +13,13 @@
  (action
   (with-stdout-to
    cli.output
-   (run %{exe:../bin/kyc_case.exe} replay -audit ../examples/approved.sexp))))
+   (run
+    %{exe:../bin/kyc_case.exe}
+    replay
+    -audit
+    -now
+    2029-10-13T00:00:00Z
+    ../examples/approved.sexp))))
 
 (rule
  (alias runtest)

@@ -1,4 +1,4 @@
-;; A customer verified to T2 and approved. PII is written in clear here and
+;; A customer verified to T2, rated Medium and approved. PII is written in clear here and
 ;; printed as <redacted> by kyc-case.
 ((id evt-1) (customer_id cus-1) (at "2026-10-13 09:00:00Z") (actor System)
  (note ())
@@ -44,5 +44,13 @@
  (actor (Provider provider-a)) (note ())
  (kind (Step_changed (step Liveness) (state (Verified "2026-10-13 09:11:00Z")))))
 ((id evt-9) (customer_id cus-1) (at "2026-10-13 09:31:00Z")
+ (actor (Operator op-1)) (note ("standard retail account, remote onboarding"))
+ (kind
+  (Risk_assessed
+   (factors
+    ((country Low) (product Low) (channel Medium) (pep Not_pep)
+     (adverse_media false)))
+   (override ()))))
+((id evt-10) (customer_id cus-1) (at "2026-10-13 09:32:00Z")
  (actor (Operator op-1)) (note ("documents consistent"))
  (kind (Status_changed Approve)))
