@@ -3,83 +3,156 @@ open Kyc_core
 open Risk
 
 let at = Time_ns.of_string_with_utc_offset "2026-10-13 09:00:00Z"
-let operator = Actor.Operator (Operator_id.of_string "op-1")
+let op = Operator_id.of_string "op-1"
+let base = Inputs.baseline
 
-let base : Factors.t =
-  { country = Low; product = Low; channel = Low; pep = Not_pep; adverse_media = false }
+let foreign_pep ?ended () =
+  Or_error.ok_exn
+    (Pep.create
+       ~kind:Pep
+       ~scope:Foreign
+       ~function_:"minister"
+       ~started:(Date.of_string "2015-01-01")
+       ?ended
+       ())
 ;;
 
-let show (f : Factors.t) =
-  let rating = rate f in
+let show (i : Inputs.t) =
+  let a = assess Model.default i ~at in
   print_s
-    [%message "" (rating : Level.t) ~edd:(edd_triggers f ~rating : Edd_trigger.t list)]
+    [%message
+      ""
+        ~score:(a.score : int)
+        ~band:(Assessment.band a : Band.t)
+        ~floors:(a.floors : Edd_trigger.t list)
+        ~edd:(edd_triggers i ~on:(Date.of_string "2026-10-13") : Edd_trigger.t list)]
 ;;
 
-let%expect_test "rating and EDD triggers" =
+let%expect_test "bands, floors and EDD triggers" =
   show base;
-  show { base with channel = Medium };
-  show { base with country = High };
-  show { base with pep = Domestic };
-  show { base with pep = Family_or_close_associate Foreign };
-  show { base with pep = International_organisation; product = High };
-  show { base with adverse_media = true };
+  show
+    { base with
+      channel = Remote_unattended
+    ; products = [ Crypto ]
+    ; monthly_volume = Up_to_10k
+    };
+  show { base with sector = High; products = [ Lightning ]; monthly_volume = Above_100k };
+  show { base with pep = Some (foreign_pep ()) };
+  show { base with pep = Some (foreign_pep ~ended:(Date.of_string "2025-01-31") ()) };
+  show { base with nationality = High_risk_third_country };
+  show { base with adverse_media = Unconfirmed };
+  show { base with adverse_media = Confirmed };
+  show
+    { base with self_hosted_exposure = true; manual_edd = [ "unusual source of wealth" ] };
   [%expect
     {|
-    ((rating Low) (edd ()))
-    ((rating Medium) (edd ()))
-    ((rating High) (edd (High_risk_rating High_risk_country)))
-    ((rating Medium) (edd (Pep_in_higher_risk_relationship)))
-    ((rating High) (edd (High_risk_rating Foreign_pep)))
-    ((rating High) (edd (High_risk_rating Pep_in_higher_risk_relationship)))
-    ((rating Medium) (edd (Adverse_media)))
+    ((score 0) (band Low) (floors ()) (edd ()))
+    ((score 35) (band Medium) (floors ()) (edd ()))
+    ((score 75) (band High) (floors ()) (edd ()))
+    ((score 40) (band High) (floors (Pep)) (edd (Pep)))
+    ((score 0) (band Low) (floors ()) (edd ()))
+    ((score 40) (band High) (floors (High_risk_third_country))
+     (edd (High_risk_third_country)))
+    ((score 15) (band Low) (floors ()) (edd ()))
+    ((score 40) (band High) (floors (Adverse_media)) (edd (Adverse_media)))
+    ((score 15) (band Low) (floors ())
+     (edd (Self_hosted_exposure (Manual "unusual source of wealth"))))
     |}]
 ;;
 
-let%expect_test "overrides" =
-  let assess ?(actor = operator) factors override =
-    print_s
-      [%sexp (Risk.assess ~assessed_at:at ~factors ~override ~actor : Risk.t Or_error.t)]
-  in
-  assess base (Some { rating = High; rationale = "linked to a high-risk business" });
-  assess ~actor:System base (Some { rating = High; rationale = "x" });
-  assess base (Some { rating = Medium; rationale = " " });
-  assess { base with pep = Foreign } (Some { rating = Low; rationale = "long retired" });
+let%expect_test "points per factor" =
+  print_s
+    [%sexp
+      (Model.points
+         Model.default
+         { base with channel = Remote_unattended; products = [ Card; Crypto ] }
+         ~on:(Date.of_string "2026-10-13")
+       : (string * int) list)];
   [%expect
     {|
-    (Ok
-     ((assessed_at "2026-10-13 09:00:00Z")
-      (factors
-       ((country Low) (product Low) (channel Low) (pep Not_pep)
-        (adverse_media false)))
-      (computed Low) (rating High)
-      (override
-       ((((rating High) (rationale "linked to a high-risk business")) op-1)))))
-    (Error "only an operator may override a risk rating")
-    (Error "a risk override needs a rationale")
+    ((sector 0) (country 0) (adverse_media 0) (pep 0) (product 20) (volume 0)
+     (channel 10) (self_hosted 0))
+    |}]
+;;
+
+let%expect_test "overrides need a reason and respect floors" =
+  let a = assess Model.default base ~at in
+  let show r = print_s [%sexp (Result.map r ~f:Assessment.band : Band.t Or_error.t)] in
+  show (override a ~band:High ~reason:"linked to a high-risk business" ~by:op ~at);
+  show (override a ~band:Medium ~reason:" " ~by:op ~at);
+  let pep = assess Model.default { base with pep = Some (foreign_pep ()) } ~at in
+  show (override pep ~band:Low ~reason:"long retired" ~by:op ~at);
+  [%expect
+    {|
+    (Ok High)
+    (Error "a risk override needs a reason")
+    (Error ("a hard floor keeps the band High" (floors (Pep)) (requested Low)))
+    |}]
+;;
+
+let%expect_test "validate catches a tampered assessment" =
+  let a = assess Model.default { base with nationality = High_risk_third_country } ~at in
+  print_s [%sexp (Assessment.validate a : unit Or_error.t)];
+  print_s [%sexp (Assessment.validate { a with computed_band = Low } : unit Or_error.t)];
+  print_s [%sexp (Assessment.validate { a with score = 140 } : unit Or_error.t)];
+  [%expect
+    {|
+    (Ok ())
     (Error
-     ("a foreign PEP rating cannot be lowered" (computed High) (requested Low)))
+     ("computed band does not match score and floors" (score 40)
+      (floors (High_risk_third_country)) (computed_band Low)))
+    (Error ("risk score out of range" (score 140)))
     |}]
 ;;
 
-let%test_unit "rating is at least every factor and never below High for foreign PEPs" =
-  Quickcheck.test Factors.quickcheck_generator ~sexp_of:[%sexp_of: Factors.t] ~f:(fun f ->
-    let r = rate f in
-    assert (Level.(r >= f.country && r >= f.product && r >= f.channel));
-    if Pep_exposure.is_foreign f.pep then assert (Level.equal r High);
-    if Level.equal r High
-    then
-      assert (
-        List.mem (edd_triggers f ~rating:r) High_risk_rating ~equal:Edd_trigger.equal))
+let%test_unit "high is reachable and floors always give High" =
+  Quickcheck.test Inputs.quickcheck_generator ~sexp_of:[%sexp_of: Inputs.t] ~f:(fun i ->
+    let a = assess Model.default i ~at in
+    assert (a.score >= 0 && a.score <= 100);
+    assert (Result.is_ok (Assessment.validate a));
+    if not (List.is_empty a.floors) then assert (Band.equal (Assessment.band a) High))
+;;
+
+let%test_unit "the score never falls when a factor gets riskier" =
+  Quickcheck.test
+    [%quickcheck.generator: Inputs.t * Band.t]
+    ~sexp_of:[%sexp_of: Inputs.t * Band.t]
+    ~f:(fun (i, sector) ->
+      let riskier = { i with sector = Band.max i.sector sector } in
+      let on = Date.of_string "2026-10-13" in
+      assert (Model.score Model.default riskier ~on >= Model.score Model.default i ~on))
+;;
+
+let%expect_test "cdd level" =
+  let show band triggers products =
+    print_s
+      [%sexp
+        (Cdd_level.decide ~band ~triggers ~products ~allow_simplified:true : Cdd_level.t)]
+  in
+  show Low [] [ Fiat_account ];
+  show Low [] [ Fiat_account; Lightning ];
+  show Medium [] [ Card ];
+  show Low [ Self_hosted_exposure ] [ Crypto ];
+  show High [] [ Fiat_account ];
+  [%expect {|
+    Simplified
+    Standard
+    Standard
+    Enhanced
+    Enhanced
+    |}]
 ;;
 
 let%expect_test "stable digests" =
-  print_endline [%bin_digest: Factors.Stable.V1.t];
-  print_endline [%bin_digest: Override.Stable.V1.t];
+  print_endline [%bin_digest: Inputs.Stable.V1.t];
+  print_endline [%bin_digest: Assessment.Stable.V1.t];
   print_endline [%bin_digest: Edd_trigger.Stable.V1.t];
+  print_endline [%bin_digest: Pep.Stable.V1.t];
   [%expect
     {|
-    c002aa4e5d55b9d5d9b6b170d6ec0f4e
-    985db5391359f3812142556b18dc9ee3
-    d8fa55580e69170266532156a29d3273
+    3627b1902ffa43e44d6a5720c77fa137
+    9bacf929d84e5817e7d1441a979f87e3
+    6e586801db82ae95aff9fa25dce158dc
+    77fbcf5dae3e9894ed9b3cfe3db3e0be
     |}]
 ;;
