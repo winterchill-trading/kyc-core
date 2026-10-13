@@ -1,0 +1,7 @@
+(executable
+ (name kyc_case)
+ (public_name kyc-case)
+ (package kyc-core)
+ (libraries core core_unix.command_unix kyc-core)
+ (preprocess
+  (pps ppx_jane)))
