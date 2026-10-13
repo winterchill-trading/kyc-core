@@ -116,12 +116,14 @@ let step_event t (event : Event.t) : (t * Audit.Change.t) Or_error.t =
     ( { t with steps = Map.set t.steps ~key:s ~data:to_ }
     , Audit.Change.Step { step = s; from; to_ } )
   | Status_changed transition, Some _ ->
-    let%bind () =
+    (* Status first, so an approval of a rejected case reports the status, not missing
+       steps. *)
+    let%bind to_ = Status.apply t.status transition ~actor:event.actor in
+    let%map () =
       match transition with
       | Approve -> can_approve t
       | Submit | Reject _ | Request_resubmission _ | Block _ | Unblock -> Ok ()
     in
-    let%map to_ = Status.apply t.status transition ~actor:event.actor in
     { t with status = to_ }, Audit.Change.Status { from = t.status; to_ }
   | Screened { screening_id; outcome }, Some _ ->
     if Map.mem t.screenings screening_id
