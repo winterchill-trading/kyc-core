@@ -6,3 +6,16 @@
  (libraries core kyc-core)
  (preprocess
   (pps ppx_jane)))
+
+(rule
+ (alias runtest)
+ (deps ../examples/approved.sexp)
+ (action
+  (with-stdout-to
+   cli.output
+   (run %{exe:../bin/kyc_case.exe} replay -audit ../examples/approved.sexp))))
+
+(rule
+ (alias runtest)
+ (action
+  (diff cli.expected cli.output)))
