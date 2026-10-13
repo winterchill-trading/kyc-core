@@ -12,6 +12,7 @@ module Stable = struct
           { reason : string
           ; previous : t
           }
+      | Closed of string (** relationship ended; starts the retention clock *)
     [@@deriving bin_io, compare, equal, hash, sexp]
   end
 end
@@ -26,6 +27,7 @@ type t = Stable.V1.t =
       { reason : string
       ; previous : t
       }
+  | Closed of string
 [@@deriving compare, equal, hash, sexp, quickcheck]
 
 module Transition = struct
@@ -38,6 +40,7 @@ module Transition = struct
         | Request_resubmission of Person.Field.Stable.V1.t list
         | Block of string
         | Unblock
+        | Close of string
       [@@deriving bin_io, compare, equal, hash, sexp]
     end
   end
@@ -49,6 +52,7 @@ module Transition = struct
     | Request_resubmission of Person.Field.t list
     | Block of string
     | Unblock
+    | Close of string
   [@@deriving compare, equal, hash, sexp, quickcheck]
 end
 
@@ -75,6 +79,8 @@ let apply t (transition : Transition.t) ~actor =
     Or_error.error_s [%message "resubmission request names no fields"]
   | (Verifying | Approved), Request_resubmission fields ->
     Ok (Needs_resubmission (List.dedup_and_sort fields ~compare:Person.Field.compare))
+  | Closed _, _ -> Or_error.error_s [%message "case is closed" ~from:(t : t)]
+  | _, Close reason -> Ok (Closed reason)
   | Blocked _, Block _ -> Or_error.error_s [%message "case is already blocked"]
   | previous, Block reason -> needs_operator (Blocked { reason; previous })
   | Blocked { previous; reason = _ }, Unblock -> needs_operator previous

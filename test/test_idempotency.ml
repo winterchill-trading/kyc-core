@@ -32,6 +32,7 @@ let kind_gen : Event.Kind.t G.t =
                    ; 1., Request_resubmission [ Mobile ]
                    ; 0.3, Block "review"
                    ; 1., Unblock
+                   ; 0.1, Close "customer left"
                    ]
                  ~f:(fun (w, t) -> w, G.return t))
           in
@@ -140,6 +141,7 @@ let%expect_test "random streams pass through every status" =
     | Rejected _ -> "Rejected"
     | Needs_resubmission _ -> "Needs_resubmission"
     | Blocked _ -> "Blocked"
+    | Closed _ -> "Closed"
   in
   Quickcheck.iter ~trials:2_000 (List.gen_with_length 40 event_gen) ~f:(fun events ->
     List.iter
@@ -150,5 +152,5 @@ let%expect_test "random streams pass through every status" =
         | _ -> ()));
   print_s
     [%sexp (Hash_set.to_list seen |> List.sort ~compare:String.compare : string list)];
-  [%expect {| (Approved Blocked Created Needs_resubmission Rejected Verifying) |}]
+  [%expect {| (Approved Blocked Closed Created Needs_resubmission Rejected Verifying) |}]
 ;;

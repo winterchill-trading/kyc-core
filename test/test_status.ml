@@ -10,6 +10,7 @@ let statuses : Status.t list =
   ; Rejected "document forged"
   ; Needs_resubmission [ Residential_address ]
   ; Blocked { reason = "sanctions match"; previous = Approved }
+  ; Closed "customer request"
   ]
 ;;
 
@@ -20,6 +21,7 @@ let transitions : Status.Transition.t list =
   ; Request_resubmission [ Mobile; Email; Mobile ]
   ; Block "sanctions match"
   ; Unblock
+  ; Close "customer request"
   ]
 ;;
 
@@ -43,6 +45,8 @@ let%expect_test "every transition, as an operator" =
     ((from Created) (transition (Block "sanctions match"))
      (result (Blocked (reason "sanctions match") (previous Created))))
     ((from Created) (transition Unblock) (result illegal))
+    ((from Created) (transition (Close "customer request"))
+     (result (Closed "customer request")))
     ((from Verifying) (transition Submit) (result illegal))
     ((from Verifying) (transition Approve) (result Approved))
     ((from Verifying) (transition (Reject "document forged"))
@@ -52,6 +56,8 @@ let%expect_test "every transition, as an operator" =
     ((from Verifying) (transition (Block "sanctions match"))
      (result (Blocked (reason "sanctions match") (previous Verifying))))
     ((from Verifying) (transition Unblock) (result illegal))
+    ((from Verifying) (transition (Close "customer request"))
+     (result (Closed "customer request")))
     ((from Approved) (transition Submit) (result illegal))
     ((from Approved) (transition Approve) (result illegal))
     ((from Approved) (transition (Reject "document forged")) (result illegal))
@@ -60,6 +66,8 @@ let%expect_test "every transition, as an operator" =
     ((from Approved) (transition (Block "sanctions match"))
      (result (Blocked (reason "sanctions match") (previous Approved))))
     ((from Approved) (transition Unblock) (result illegal))
+    ((from Approved) (transition (Close "customer request"))
+     (result (Closed "customer request")))
     ((from (Rejected "document forged")) (transition Submit) (result illegal))
     ((from (Rejected "document forged")) (transition Approve) (result illegal))
     ((from (Rejected "document forged")) (transition (Reject "document forged"))
@@ -71,6 +79,8 @@ let%expect_test "every transition, as an operator" =
       (Blocked (reason "sanctions match")
        (previous (Rejected "document forged")))))
     ((from (Rejected "document forged")) (transition Unblock) (result illegal))
+    ((from (Rejected "document forged")) (transition (Close "customer request"))
+     (result (Closed "customer request")))
     ((from (Needs_resubmission (Residential_address))) (transition Submit)
      (result Verifying))
     ((from (Needs_resubmission (Residential_address))) (transition Approve)
@@ -87,6 +97,9 @@ let%expect_test "every transition, as an operator" =
        (previous (Needs_resubmission (Residential_address))))))
     ((from (Needs_resubmission (Residential_address))) (transition Unblock)
      (result illegal))
+    ((from (Needs_resubmission (Residential_address)))
+     (transition (Close "customer request"))
+     (result (Closed "customer request")))
     ((from (Blocked (reason "sanctions match") (previous Approved)))
      (transition Submit) (result illegal))
     ((from (Blocked (reason "sanctions match") (previous Approved)))
@@ -99,6 +112,20 @@ let%expect_test "every transition, as an operator" =
      (transition (Block "sanctions match")) (result illegal))
     ((from (Blocked (reason "sanctions match") (previous Approved)))
      (transition Unblock) (result Approved))
+    ((from (Blocked (reason "sanctions match") (previous Approved)))
+     (transition (Close "customer request"))
+     (result (Closed "customer request")))
+    ((from (Closed "customer request")) (transition Submit) (result illegal))
+    ((from (Closed "customer request")) (transition Approve) (result illegal))
+    ((from (Closed "customer request")) (transition (Reject "document forged"))
+     (result illegal))
+    ((from (Closed "customer request"))
+     (transition (Request_resubmission (Mobile Email Mobile))) (result illegal))
+    ((from (Closed "customer request")) (transition (Block "sanctions match"))
+     (result illegal))
+    ((from (Closed "customer request")) (transition Unblock) (result illegal))
+    ((from (Closed "customer request")) (transition (Close "customer request"))
+     (result illegal))
     |}]
 ;;
 
@@ -152,7 +179,7 @@ let%test_unit "unblock restores the status before the block" =
     ~sexp_of:[%sexp_of: Status.t]
     ~f:(fun status ->
       match status with
-      | Blocked _ -> ()
+      | Blocked _ | Closed _ -> ()
       | _ ->
         let restored =
           let open Or_error.Let_syntax in
@@ -167,7 +194,7 @@ let%expect_test "stable digests" =
   print_endline [%bin_digest: Status.Transition.Stable.V1.t];
   [%expect
     {|
-    007f2150bd05fbebc312f09e09becf22
-    61a9b5e3f2f1bc099e50f232de48a620
+    f2b977fc171062708274eb70899abcdb
+    2800d806c380aeda947e8b1523071af2
     |}]
 ;;

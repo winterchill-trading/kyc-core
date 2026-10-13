@@ -10,11 +10,13 @@
       Approved ----------- Request_resubmission -> Needs_resubmission (periodic review)
       any but Blocked ---- Block -----------> Blocked (remembers the previous status)
       Blocked ------------ Unblock ---------> the previous status
+      any but Closed ----- Close -----------> Closed (relationship ended, final)
     v}
 
-    [Rejected] is final apart from [Block]. [Block] and [Unblock] are compliance decisions
-    and need an [Operator] actor. Other guards (verified steps, open screening hits) are
-    checked by {!Kyc_case}, which knows the whole case. *)
+    [Rejected] is final apart from [Block] and [Close]; [Closed] is final. [Block] and
+    [Unblock] are compliance decisions and need an [Operator] actor. Other guards
+    (verified steps, open screening hits) are checked by {!Kyc_case}, which knows the
+    whole case. *)
 
 open! Core
 
@@ -30,6 +32,7 @@ module Stable : sig
           { reason : string
           ; previous : t
           }
+      | Closed of string (** relationship ended; starts the retention clock *)
     [@@deriving bin_io, compare, equal, hash, sexp]
   end
 end
@@ -44,6 +47,7 @@ type t = Stable.V1.t =
       { reason : string
       ; previous : t
       }
+  | Closed of string
 [@@deriving compare, equal, hash, sexp, quickcheck]
 
 module Transition : sig
@@ -56,6 +60,7 @@ module Transition : sig
         | Request_resubmission of Person.Field.Stable.V1.t list
         | Block of string
         | Unblock
+        | Close of string
       [@@deriving bin_io, compare, equal, hash, sexp]
     end
   end
@@ -67,6 +72,7 @@ module Transition : sig
     | Request_resubmission of Person.Field.t list (** must not be empty *)
     | Block of string
     | Unblock
+    | Close of string
   [@@deriving compare, equal, hash, sexp, quickcheck]
 end
 

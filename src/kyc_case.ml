@@ -48,7 +48,7 @@ let verified_tier t = Tier.Rules.tier_of t.policy.rules ~verified:(verified_step
 
 let tier t =
   match t.status with
-  | Rejected _ | Blocked _ -> Tier.T0
+  | Rejected _ | Blocked _ | Closed _ -> Tier.T0
   | Approved -> verified_tier t
   | Created | Verifying | Needs_resubmission _ -> Tier.min (verified_tier t) T1
 ;;
@@ -101,7 +101,7 @@ let step_event t (event : Event.t) : (t * Audit.Change.t) Or_error.t =
         | [] -> Or_error.error_s [%message "person update changes nothing"]
         | fields ->
           Ok ({ t with person = Some person }, Audit.Change.Person_updated fields))
-     | Verifying | Approved | Rejected _ | Blocked _ ->
+     | Verifying | Approved | Rejected _ | Blocked _ | Closed _ ->
        Or_error.error_s
          [%message
            "person can only change before submission or when resubmission is requested"
@@ -122,7 +122,7 @@ let step_event t (event : Event.t) : (t * Audit.Change.t) Or_error.t =
     let%map () =
       match transition with
       | Approve -> can_approve t
-      | Submit | Reject _ | Request_resubmission _ | Block _ | Unblock -> Ok ()
+      | Submit | Reject _ | Request_resubmission _ | Block _ | Unblock | Close _ -> Ok ()
     in
     { t with status = to_ }, Audit.Change.Status { from = t.status; to_ }
   | Screened { screening_id; outcome }, Some _ ->
