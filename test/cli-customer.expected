@@ -1,0 +1,25 @@
+((status Active) (tier T2) (steps_to_complete ()) (fields_to_resubmit ()))
+((at "2026-10-13 09:00:00Z") (actor System) (event_id evt-1) (change Opened)
+ (why ()))
+((at "2026-10-13 09:01:00Z") (actor (Provider provider-a)) (event_id evt-2)
+ (change
+  (Step (step Email) (from Pending) (to_ (Verified "2026-10-13 09:01:00Z"))))
+ (why ()))
+((at "2026-10-13 09:02:00Z") (actor (Provider provider-a)) (event_id evt-3)
+ (change
+  (Step (step Mobile) (from Pending) (to_ (Verified "2026-10-13 09:02:00Z"))))
+ (why ()))
+((at "2026-10-13 09:03:00Z") (actor System) (event_id evt-4)
+ (change (Status (from Created) (to_ Verifying))) (why ()))
+((at "2026-10-13 09:10:00Z") (actor (Provider provider-a)) (event_id evt-5)
+ (change
+  (Step (step Identity_document) (from Pending)
+   (to_ (Verified "2026-10-13 09:10:00Z"))))
+ (why ()))
+((at "2026-10-13 09:11:00Z") (actor (Provider provider-a)) (event_id evt-6)
+ (change
+  (Step (step Liveness) (from Pending)
+   (to_ (Verified "2026-10-13 09:11:00Z"))))
+ (why ()))
+((at "2026-10-13 09:32:00Z") (actor (Operator op-a)) (event_id evt-11)
+ (change (Status (from Verifying) (to_ Approved))) (why ()))

@@ -18,8 +18,27 @@
     replay
     -audit
     -now
-    2029-10-13T00:00:00Z
+    2032-10-13T00:00:00Z
     ../examples/approved.sexp))))
+
+(rule
+ (alias runtest)
+ (deps ../examples/approved.sexp)
+ (action
+  (with-stdout-to
+   cli-customer.output
+   (run
+    %{exe:../bin/kyc_case.exe}
+    replay
+    -audit
+    -as
+    customer
+    ../examples/approved.sexp))))
+
+(rule
+ (alias runtest)
+ (action
+  (diff cli-customer.expected cli-customer.output)))
 
 (rule
  (alias runtest)
