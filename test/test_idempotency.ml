@@ -6,8 +6,8 @@ let customer = Customer_id.of_string "cus-1"
 let t0 = Time_ns.of_string_with_utc_offset "2026-10-13 09:00:00Z"
 
 (* Mostly plausible events so that random streams reach every status; the derived
-   generator adds arbitrary ones. Ids come from a small pool, so streams also reuse ids
-   with different content. *)
+   generator adds arbitrary ones. Ids come from a pool of 100, so 40-event streams often
+   reuse ids with different content. *)
 let kind_gen : Event.Kind.t G.t =
   let open G.Let_syntax in
   let plausible =
