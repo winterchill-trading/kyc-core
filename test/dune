@@ -1,0 +1,8 @@
+(library
+ (name kyc_core_test)
+ (inline_tests
+  (flags
+   (:standard -source-tree-root .)))
+ (libraries core kyc-core)
+ (preprocess
+  (pps ppx_jane)))

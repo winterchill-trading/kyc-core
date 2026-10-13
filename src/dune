@@ -1,0 +1,6 @@
+(library
+ (name kyc_core)
+ (public_name kyc-core)
+ (libraries core)
+ (preprocess
+  (pps ppx_jane)))
