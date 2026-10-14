@@ -75,7 +75,10 @@ module Edd_trigger : sig
   [@@deriving compare, equal, hash, sexp, quickcheck]
 end
 
+(** EDD triggers on a date: those of {!Inputs.to_customer} plus opaque ownership. *)
 val edd_triggers : Inputs.t -> on:Date.t -> Edd_trigger.t list
+
+(** The triggers that force [High] whatever the score. *)
 val hard_floors : Inputs.t -> on:Date.t -> Edd_trigger.t list
 
 module Model : sig
@@ -126,6 +129,7 @@ module Assessment : sig
     }
   [@@deriving compare, equal, hash, sexp]
 
+  (** The override's band if any, else [computed_band]. *)
   val band : t -> Risk.Band.t
 
   (** Score in 0-100, band consistent with score and floors, override with a reason and
@@ -133,8 +137,10 @@ module Assessment : sig
   val validate : t -> unit Or_error.t
 end
 
+(** Scores [inputs] with [model] at [at]. *)
 val assess : Model.t -> Inputs.t -> at:Timestamp.t -> Assessment.t
 
+(** Sets an operator's band with a reason; refused below a hard floor. *)
 val override
   :  Assessment.t
   -> band:Risk.Band.t

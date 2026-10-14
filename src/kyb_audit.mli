@@ -70,6 +70,8 @@ module Change : sig
     | Periodic_review_completed
   [@@deriving compare, equal, hash, sexp]
 
+  (** Who may see the change: block reasons and blocked linked people are [Restricted],
+      risk and linked people's case states [Internal], the rest [Public]. *)
   val visibility : t -> Visibility.Class.t
 end
 
@@ -99,7 +101,10 @@ end
 
 type t [@@deriving compare, equal, sexp_of]
 
+(** No entries. *)
 val empty : t
+
+(** Appends an entry. *)
 val add : t -> Entry.t -> t
 
 (** Oldest first. *)
@@ -108,4 +113,5 @@ val entries : t -> Entry.t list
 (** Oldest first, only what the audience may see; the applicant's copy has no [why] notes. *)
 val for_audience : t -> Visibility.Audience.t -> Entry.t list
 
+(** Number of entries. *)
 val length : t -> int

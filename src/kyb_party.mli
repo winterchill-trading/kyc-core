@@ -105,4 +105,5 @@ val needs_approved_case
   -> threshold_bps:int
   -> Customer_id.t list
 
+(** Whether the party holds the role. *)
 val has_role : t -> Role.t -> bool

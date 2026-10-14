@@ -48,4 +48,5 @@ val is_legal_arrangement : t -> bool
     ["private_limited_company"]; [Other s] is ["other:" ^ s]. *)
 val to_string : t -> string
 
+(** Inverse of {!to_string}. *)
 val of_string : string -> t Or_error.t

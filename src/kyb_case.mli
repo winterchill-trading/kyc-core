@@ -88,38 +88,58 @@ end
 
 type t [@@deriving compare, equal, sexp_of]
 
+(** An empty case in [Draft]; the first event must be [Opened]. *)
 val create : ?policy:Policy.t -> Entity_id.t -> t
+
+(** Applies one event; see the rules above. *)
 val apply : t -> Kyb_event.t -> t Or_error.t
 
 (** Applies in list order and stops at the first error, naming the event. *)
 val of_events : ?policy:Policy.t -> Entity_id.t -> Kyb_event.t list -> t Or_error.t
 
+(** The entity the case is about. *)
 val entity_id : t -> Entity_id.t
+
+(** The policy the case was created with. *)
 val policy : t -> Policy.t
 
 (** [None] until the [Opened] event. *)
 val entity : t -> Legal_entity.t option
 
+(** The linked people, as last set. *)
 val parties : t -> Kyb_party.t list
 
 (** The latest reported status of each linked person's own case. *)
 val party_status : t -> Customer_id.t -> Status.t option
 
+(** Document metadata, by id. *)
 val documents : t -> Kyb_document.t list
+
+(** The latest declaration. *)
 val source_of_funds : t -> Source_of_funds.t option
+
+(** The current status. *)
 val status : t -> Kyb_status.t
 
 (** 0 before the first submission. *)
 val round : t -> int
 
+(** Time of the latest submission. *)
 val submitted_at : t -> Timestamp.t option
 
 (** Oldest first. *)
 val decisions : t -> Decision.t list
 
+(** The audit trail. *)
 val audit : t -> Kyb_audit.t
+
+(** Whether an event with this id was applied. *)
 val has_applied : t -> Event_id.t -> bool
+
+(** The latest risk assessment. *)
 val risk : t -> Kyb_risk.Assessment.t option
+
+(** Its band, after any override. *)
 val band : t -> Risk.Band.t option
 
 (** Beneficial owners under the policy's threshold; see {!Kyb_party.beneficial_owners}. *)
@@ -136,6 +156,7 @@ val missing_for_submission : t -> Kyb_item.t list
 (** People whose own KYC case must be approved and is not. *)
 val parties_pending : t -> Customer_id.t list
 
+(** EDD triggers of the latest assessment on [now]; none before one. *)
 val edd_triggers : t -> now:Timestamp.t -> Kyb_risk.Edd_trigger.t list
 
 (** [Enhanced] for any EDD trigger or a [High] band, else [Standard]; simplified due
@@ -146,16 +167,23 @@ val cdd_level : t -> now:Timestamp.t -> Cdd_level.t
     submission, linked people not approved, no risk assessment, or EDD outstanding. *)
 val can_approve : t -> now:Timestamp.t -> unit Or_error.t
 
+(** Last approval or completed periodic review. *)
 val last_review_at : t -> Timestamp.t option
 
 (** [last_review_at] plus the interval for the current band, while approved and rated. *)
 val next_review_due : t -> Timestamp.t option
 
+(** When the relationship ended. *)
 val closed_at : t -> Timestamp.t option
+
+(** When the application was rejected. *)
 val refused_at : t -> Timestamp.t option
 
 (** See {!Retention.retain_until}; business cases carry no legal hold here. *)
 val retain_until : t -> Timestamp.t option
 
+(** Work the case needs at [now]. *)
 val follow_ups : t -> now:Timestamp.t -> Follow_up.t list
+
+(** The applicant's view; see {!Applicant_view}. *)
 val applicant_view : t -> Applicant_view.t

@@ -79,6 +79,7 @@ module Transition : sig
   [@@deriving compare, equal, hash, sexp, quickcheck]
 end
 
+(** The status after [transition], or why it is illegal from this status. *)
 val apply : t -> Transition.t -> actor:Actor.t -> t Or_error.t
 
 (** [Draft] or [More_information]: the applicant may change the case. *)

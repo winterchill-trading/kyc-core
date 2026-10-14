@@ -110,5 +110,6 @@ module Requirement : sig
 
   include Comparable.S with type t := t
 
+  (** Same kind, about the same party (or both about the entity). *)
   val met_by : t -> document:document -> bool
 end

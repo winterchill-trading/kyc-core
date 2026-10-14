@@ -58,6 +58,7 @@ module Chain : sig
     }
   [@@deriving compare, equal, hash, sexp, quickcheck]
 
+  (** A direct holding of [bps] in the applicant. *)
   val direct : bps:int -> t
 
   (** Number of intermediates. *)
@@ -79,19 +80,26 @@ module Share : sig
 
   include Comparable.S_plain with type t := t
 
+  (** No ownership. *)
   val zero : t
+
+  (** 100 %. *)
   val whole : t
+
+  (** From basis points (1 to 10000). *)
   val of_bps : int -> t
 
   (** Rounded down. *)
   val to_bps : t -> int
 
+  (** Sum, e.g. of a person's chains. *)
   val ( + ) : t -> t -> t
 
   (** E.g. ["25.5%"], at most four decimals, rounded down. *)
   val to_percent_string : t -> string
 end
 
+(** The product of the stakes along the chain. *)
 val effective : Chain.t -> Share.t
 
 module Opacity : sig
@@ -127,4 +135,5 @@ module Opacity : sig
   include Comparable.S with type t := t
 end
 
+(** The opacity of the applicant's whole structure: its own bearer shares and every chain. *)
 val opacity : Legal_entity.t -> Chain.t list -> Opacity.t
