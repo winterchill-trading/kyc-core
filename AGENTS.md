@@ -12,6 +12,7 @@ does no I/O and uses no Async; a provider adapter turns webhooks into `Event.t` 
 | Path | Holds |
 | --- | --- |
 | `src/` | Library `kyc-core` (module `Kyc_core`): identifiers, `Pii`, `Tier`, `Risk`, `Screening`, `Event`, `Kyc_case` and the rest |
+| `src/kyb_*`, `src/legal_*`, `src/ownership.*` | Business verification (KYB): `Legal_entity`, `Ownership`, `Kyb_party`, `Kyb_requirements`, `Kyb_risk`, `Kyb_event`, `Kyb_case` |
 | `bin/` | The `kyc-case` CLI: `replay`, `policy`, `assess`, `match` |
 | `examples/` | `approved.sexp`, a case used by the CLI cram test |
 | `test/` | Expect tests per rule, Base_quickcheck properties, the CLI expected outputs |
