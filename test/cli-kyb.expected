@@ -1,0 +1,104 @@
+(skipped
+ (err
+  ((event evt-22)
+   ("event for another submission round" (round 1) (current 2)))))
+((entity ent-1) (status Approved) (round 2) (band (Low)) (cdd Standard)
+ (beneficial_owners ((alice ((Ownership 60%))) (bob ((Ownership 40%)))))
+ (missing ()) (parties_pending ())
+ (decisions
+  (((round 1)
+    (outcome
+     (More_information
+      ((Document ((kind Source_of_funds_evidence) (party ())))
+       (Document ((kind Bank_statement) (party ()))))))
+    (at "2026-10-13 09:40:00Z") (actor (Provider provider-a))
+    (note ("Please evidence the licence revenue")))
+   ((round 2) (outcome Approved) (at "2026-10-14 11:00:00Z")
+    (actor (Provider provider-a)) (note ("All checks passed")))))
+ (next_review_due ("2031-10-13 11:00:00Z")) (retain_until ())
+ (follow_ups ()))
+((at "2026-10-13 09:00:00Z") (actor System) (event_id kyb-1) (change Opened)
+ (why ()))
+((at "2026-10-13 09:05:00Z") (actor System) (event_id kyb-2)
+ (change
+  (Entity_updated
+   (Registration_number Incorporation_date Registered_address Industry)))
+ (why ()))
+((at "2026-10-13 09:06:00Z") (actor System) (event_id kyb-3)
+ (change (Parties_set (alice bob carol))) (why ()))
+((at "2026-10-13 09:07:00Z") (actor System) (event_id kyb-4)
+ (change
+  (Document_added (document_id doc-coi) (kind Certificate_of_incorporation)
+   (party ())))
+ (why ()))
+((at "2026-10-13 09:07:10Z") (actor System) (event_id kyb-5)
+ (change
+  (Document_added (document_id doc-aoa) (kind Articles_of_association)
+   (party ())))
+ (why ()))
+((at "2026-10-13 09:07:20Z") (actor System) (event_id kyb-6)
+ (change
+  (Document_added (document_id doc-reg) (kind Shareholder_register)
+   (party ())))
+ (why ()))
+((at "2026-10-13 09:07:30Z") (actor System) (event_id kyb-7)
+ (change
+  (Document_added (document_id doc-dir) (kind Register_of_directors)
+   (party ())))
+ (why ()))
+((at "2026-10-13 09:07:40Z") (actor System) (event_id kyb-8)
+ (change
+  (Document_added (document_id doc-chart) (kind Ownership_chart) (party ())))
+ (why ()))
+((at "2026-10-13 09:07:50Z") (actor System) (event_id kyb-9)
+ (change
+  (Document_added (document_id doc-poa) (kind Power_of_attorney)
+   (party (carol))))
+ (why ()))
+((at "2026-10-13 09:08:00Z") (actor System) (event_id kyb-10)
+ (change Source_of_funds_declared) (why ()))
+((at "2026-10-13 09:10:00Z") (actor System) (event_id kyb-11)
+ (change (Status (from Draft) (to_ Submitted) (round 1))) (why ()))
+((at "2026-10-13 09:10:03Z") (actor (Provider provider-a)) (event_id evt-20)
+ (change (Status (from Submitted) (to_ In_review) (round 1))) (why ()))
+((at "2026-10-13 09:40:00Z") (actor (Provider provider-a)) (event_id evt-21)
+ (change
+  (Status (from In_review)
+   (to_
+    (More_information
+     ((Document ((kind Source_of_funds_evidence) (party ())))
+      (Document ((kind Bank_statement) (party ()))))))
+   (round 1)))
+ (why ("Please evidence the licence revenue")))
+((at "2026-10-14 10:00:00Z") (actor System) (event_id kyb-12)
+ (change
+  (Document_added (document_id doc-sof) (kind Source_of_funds_evidence)
+   (party ())))
+ (why ()))
+((at "2026-10-14 10:01:00Z") (actor System) (event_id kyb-13)
+ (change
+  (Document_added (document_id doc-bank) (kind Bank_statement) (party ())))
+ (why ()))
+((at "2026-10-14 10:02:00Z") (actor System) (event_id kyb-14)
+ (change
+  (Status
+   (from
+    (More_information
+     ((Document ((kind Source_of_funds_evidence) (party ())))
+      (Document ((kind Bank_statement) (party ()))))))
+   (to_ Submitted) (round 2)))
+ (why ()))
+((at "2026-10-14 10:05:00Z") (actor System) (event_id kyb-15)
+ (change (Party_case_changed (party alice) (status Approved))) (why ()))
+((at "2026-10-14 10:06:00Z") (actor System) (event_id kyb-16)
+ (change (Party_case_changed (party bob) (status Approved))) (why ()))
+((at "2026-10-14 10:07:00Z") (actor System) (event_id kyb-17)
+ (change (Party_case_changed (party carol) (status Approved))) (why ()))
+((at "2026-10-14 10:10:00Z") (actor (Operator op-a)) (event_id kyb-18)
+ (change
+  (Risk_assessed (score 25) (computed_band Low) (band Low)
+   (model_version kyb-risk-2026-10)))
+ (why (onboarding)))
+((at "2026-10-14 11:00:00Z") (actor (Provider provider-a)) (event_id evt-23)
+ (change (Status (from Submitted) (to_ Approved) (round 2)))
+ (why ("All checks passed")))

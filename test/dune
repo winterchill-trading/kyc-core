@@ -44,3 +44,36 @@
  (alias runtest)
  (action
   (diff cli.expected cli.output)))
+
+(rule
+ (alias runtest)
+ (deps ../examples/kyb-approved.sexp)
+ (action
+  (with-stdout-to
+   cli-kyb.output
+   (run %{exe:../bin/kyc_case.exe} kyb replay -audit ../examples/kyb-approved.sexp))))
+
+(rule
+ (alias runtest)
+ (deps ../examples/kyb-approved.sexp)
+ (action
+  (with-stdout-to
+   cli-kyb-applicant.output
+   (run
+    %{exe:../bin/kyc_case.exe}
+    kyb
+    replay
+    -audit
+    -as
+    customer
+    ../examples/kyb-approved.sexp))))
+
+(rule
+ (alias runtest)
+ (action
+  (diff cli-kyb.expected cli-kyb.output)))
+
+(rule
+ (alias runtest)
+ (action
+  (diff cli-kyb-applicant.expected cli-kyb-applicant.output)))
