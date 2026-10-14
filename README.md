@@ -5,8 +5,9 @@ screening provider: identity verification steps and tiers, a risk-based
 customer risk rating with CDD levels and enhanced due diligence (EDD), PEP
 records, sanctions/PEP/adverse-media screening with four-eyes discounting,
 ongoing monitoring, investigations and FIU reporting, periodic review,
-record retention with legal holds, travel-rule data for crypto transfers, and
-an audit trail of every change with its actor. Pure OCaml over `core`; no
+record retention with legal holds, travel-rule data for crypto transfers,
+business verification (KYB) for legal entities with their beneficial owners,
+and an audit trail of every change with its actor. Pure OCaml over `core`; no
 I/O, no Async.
 
 The model follows the FATF Recommendations (R.1, R.6, R.10, R.11, R.12, R.15,
@@ -32,6 +33,10 @@ opam exec -- dune exec kyc-case -- replay -audit examples/approved.sexp
 opam exec -- dune exec kyc-case -- replay -as customer examples/approved.sexp
 opam exec -- dune exec kyc-case -- policy
 opam exec -- dune exec kyc-case -- match "Jürgen Müller" "MUELLER, Juergen"
+opam exec -- dune exec kyc-case -- kyb replay -audit examples/kyb-approved.sexp
+opam exec -- dune exec kyc-case -- kyb replay -as customer examples/kyb-approved.sexp
+opam exec -- dune exec kyc-case -- kyb requirements -jurisdiction DE -legal-form private_limited_company
+opam exec -- dune exec kyc-case -- kyb policy
 ```
 
 As a library (`(libraries kyc-core)`):
@@ -83,6 +88,16 @@ let rate case ~operator ~inputs ~at =
 | `Travel_rule` | TFR Art. 14 originator/beneficiary data, self-hosted ownership checks above EUR 1 000 |
 | `Event`, `Audit` | persisted events (with provider event id) and the audit trail |
 | `Kyc_case` | the aggregate: `apply`, tiers, `cdd_level`, `can_approve`, `follow_ups`, `customer_view`, review and retention dates |
+| `Entity_id`, `Document_id` | string ids for business applicants and document records |
+| `Legal_form`, `Legal_entity` | generic legal forms (trusts as legal arrangements); registration number, jurisdiction, addresses, industry, bearer shares |
+| `Ownership` | ownership chains through intermediates, effective shares (exact parts per 10^12), opacity |
+| `Kyb_party` | directors, representatives, shareholders, controllers, senior managing officials and trust parties, each linked to their own `Kyc_case`; beneficial-owner determination |
+| `Kyb_document`, `Kyb_requirements` | document metadata (no content) and the required-documents table by legal form and jurisdiction, with coverage |
+| `Source_of_funds` | the applicant's declaration of sources and expected volume |
+| `Kyb_item`, `Kyb_status` | missing or requested items; the business case status machine |
+| `Kyb_risk` | business risk over `Risk` plus ownership opacity and cash intensity |
+| `Kyb_event`, `Kyb_audit` | persisted business events (with provider event id and round) and their audit trail |
+| `Kyb_case` | the business aggregate: rounds, decisions, `can_approve`, `follow_ups`, `applicant_view`, review and retention dates |
 
 ## Rules
 
@@ -158,6 +173,61 @@ Idempotency: an event id that was already applied is a no-op; the same id
 with different content is an error. Illegal events return `Error` and leave
 the case unchanged; nothing raises. Apply events in the order they happened.
 
+## Business verification (KYB)
+
+A business applicant gets a `Kyb_case`, keyed by an `Entity_id` and rebuilt
+from `Kyb_event.t` values under the same idempotency rules as a personal case.
+Every director, authorised representative, owner and controller is a
+`Kyb_party` that points at the person's own `Kyc_case` by `Customer_id`: their
+identity, screening and PEP status are checked there, and the platform reports
+each person's case status to the business case with `Party_case_changed`.
+
+```
+Draft --Submit--> Submitted (round 1)            (completeness check)
+Submitted --Start_review--> In_review
+Submitted / In_review --Approve--> Approved       (guards below)
+Submitted / In_review --Request_information items--> More_information
+More_information --Submit--> Submitted (next round)
+Approved --Request_information--> More_information (periodic review)
+Submitted / In_review / More_information --Reject reason--> Rejected
+any but Blocked/Closed --Block (operator)--> Blocked { previous }
+Blocked --Unblock (operator)--> previous
+any but Closed --Close--> Closed
+```
+
+- Editing (entity, parties, documents, source of funds) is allowed in `Draft`
+  and `More_information` only; the jurisdiction is fixed after the first
+  submission. Opening and updates check that the jurisdiction is covered and
+  accepts the legal form.
+- A status event may name the round it is about; a decision about an older
+  round is refused, so a late provider event cannot overturn a resubmission.
+- `Submit` needs the registration data, at least one director (a trustee for a
+  trust), identified beneficial owners, every required document and a
+  source-of-funds declaration. `missing_for_submission` lists what is missing.
+- Beneficial owners: 25 % or more (policy `owner_threshold_bps`, AMLR Art. 52)
+  summed over all chains, where a chain multiplies the stakes through each
+  intermediate; anyone with control by other means; every settlor, trustee,
+  protector and beneficiary of a trust; and only when none exists, the senior
+  managing officials.
+- Required documents come from `Kyb_requirements`: a list per legal form, extra
+  documents per jurisdiction, an ownership chart when any owner holds through
+  an intermediate, and a power of attorney per representative who is not a
+  director. Files are never stored, only metadata.
+- `Approve` needs everything `Submit` needs, every beneficial owner, director
+  and representative approved in their own case, a risk assessment and, under
+  EDD, a senior sign-off with a rationale after the latest assessment.
+- Risk: `Kyb_risk` maps the entity onto `Risk.Inputs` (industry as sector,
+  registration country, worst other country, a PEP among the people) and adds
+  ownership opacity (Transparent 0, Layered 5, Complex 15, Opaque 40) and a
+  cash-intensive business (15). Opaque ownership (bearer shares, nominees) is
+  a hard floor to High, alongside the personal floors.
+- Periodic review falls due by band as for persons; completing it needs a
+  fresh assessment, the people still approved and no outstanding EDD.
+- Tipping-off: `Kyb_case.applicant_view` shows a blocked case as
+  `Under_review` with nothing requested, and never names a linked person whose
+  own case is blocked; `Kyb_audit.for_audience Customer` drops risk, linked
+  people's case states, block reasons and staff notes.
+
 ## Stored formats
 
 `Event.Stable.V1` (and the `Stable` modules it is built from, plus
@@ -166,7 +236,8 @@ the case unchanged; nothing raises. Apply events in the order they happened.
 pinned in the tests. Store events and rebuild cases with
 `Kyc_case.of_events`; a risk assessment is stored as computed, so replaying
 never rescores with a newer model. PII is in clear inside bin_io, so the event
-store is PII storage. A sexp of an event redacts PII and cannot be read back
+store is PII storage. `Kyb_event.Stable.V1` and `Kyb_audit.Entry.Stable.V1`
+are the business-case formats, pinned the same way. A sexp of an event redacts PII and cannot be read back
 into the same value; sexps are for logs and hand-written fixtures.
 
 ## Environment variables
@@ -185,12 +256,19 @@ Everything is verified by tests in this repo; there is no live API.
 - applying the same event twice equals applying it once, and redelivering every accepted event changes nothing, over random streams that reach every status (Quickcheck)
 - PII redaction in persons, events and travel-rule records; bin_io round trips keep PII
 - the `kyc-case` CLI over `examples/approved.sexp`, as compliance and as the customer
+- KYB: every business status transition, legal and illegal; effective ownership through chains, beneficial owners (threshold, control, trusts, senior managing official fallback), opacity; documents by legal form and jurisdiction; rounds and stale decisions; approval guards and EDD; what the applicant sees when blocked
+- KYB properties (Quickcheck): applying an event twice equals once, redelivering accepted events and rebuilding with `of_events` give the same case, rounds never go down, a blocked case shows the applicant nothing; random streams reach every status
+- `kyc-case kyb replay` over `examples/kyb-approved.sexp`, for staff and for the applicant
 
 ## Known gaps
 
 - Name matching folds Latin scripts only; other scripts are not transliterated
   (ICU-style transliteration needs a Unicode library not on the switch).
-- No beneficial-owner (legal entity) model yet; customers are natural persons.
+- The business case does not screen the entity's own name against sanctions
+  lists; the linked people are screened in their own cases. Run an entity
+  screening outside and block the business case if it confirms.
+- Monthly limits per jurisdiction are declared in `Kyb_requirements` for the
+  caller to enforce; the library does not track volumes.
 - FIU working days skip weekends only; pass the FIU country's holiday calendar
   to `Investigation.Fiu_request.create` (the case uses no holidays).
 - Report contents (goAML XML etc.) are out of scope; only report states are tracked.
