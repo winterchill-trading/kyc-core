@@ -1,7 +1,7 @@
 (** A business applicant's due-diligence case (KYB): the legal entity, the people linked
-    to it (each with their own {!Kyc_case}), beneficial ownership, required documents,
-    the source-of-funds declaration, submission rounds with requests for more
-    information, decisions, risk rating, EDD sign-off, periodic review and retention.
+    to it (each with their own {!Kyc_case}), beneficial ownership, required documents, the
+    source-of-funds declaration, submission rounds with requests for more information,
+    decisions, risk rating, EDD sign-off, periodic review and retention.
 
     The case is derived state: persist the {!Kyb_event.t} stream and rebuild with
     {!of_events}. It follows the same rules as {!Kyc_case}: [apply] never raises, an
@@ -79,7 +79,8 @@ module Applicant_view : sig
     ; round : int
     ; requested : Kyb_item.t list (** asked for in the latest request *)
     ; missing : Kyb_item.t list (** still needed before submission *)
-    ; parties_pending : Customer_id.t list (** people who still have to complete verification *)
+    ; parties_pending : Customer_id.t list
+    (** people who still have to complete verification *)
     ; reason : string option (** the rejection reason code *)
     }
   [@@deriving compare, equal, sexp]

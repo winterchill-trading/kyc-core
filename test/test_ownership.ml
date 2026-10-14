@@ -9,7 +9,12 @@ let entity =
     ~legal_form:Private_limited_company
 ;;
 
-let holding ?(country = "GB") ?(form = Legal_form.Private_limited_company) ?(nominee = false) name bps
+let holding
+  ?(country = "GB")
+  ?(form = Legal_form.Private_limited_company)
+  ?(nominee = false)
+  name
+  bps
   : O.Intermediate.t
   =
   { name
@@ -31,7 +36,8 @@ let%expect_test "effective share multiplies along the chain" =
   show (O.Chain.direct ~bps:2500);
   show { stake_bps = 5000; via = [ holding "Holdco" 5000 ] };
   show { stake_bps = 10_000; via = [ holding "A" 3333; holding "B" 7500 ] };
-  show { stake_bps = 6000; via = [ holding "A" 7000; holding "B" 8000; holding "C" 9000 ] };
+  show
+    { stake_bps = 6000; via = [ holding "A" 7000; holding "B" 8000; holding "C" 9000 ] };
   [%expect
     {|
     25% (2500 bps)
@@ -48,9 +54,7 @@ let%test_unit "a chain never exceeds its weakest stake" =
      let%map stake_bps = bps
      and stakes = List.gen_with_length 4 bps
      and layers = Int.gen_incl 0 4 in
-     ({ stake_bps
-      ; via = List.take stakes layers |> List.map ~f:(fun b -> holding "X" b)
-      }
+     ({ stake_bps; via = List.take stakes layers |> List.map ~f:(fun b -> holding "X" b) }
       : O.Chain.t))
     ~sexp_of:O.Chain.sexp_of_t
     ~f:(fun c ->
@@ -64,7 +68,10 @@ let%expect_test "validation" =
   let check c = print_s [%sexp (O.Chain.validate c : unit Or_error.t)] in
   check (O.Chain.direct ~bps:0);
   check { stake_bps = 5000; via = [ holding " " 10_001 ] };
-  check { stake_bps = 5000; via = List.init 11 ~f:(fun i -> holding (sprintf "L%d" i) 10_000) };
+  check
+    { stake_bps = 5000
+    ; via = List.init 11 ~f:(fun i -> holding (sprintf "L%d" i) 10_000)
+    };
   [%expect
     {|
     (Error
@@ -86,9 +93,13 @@ let%expect_test "opacity" =
   show entity [ { stake_bps = 10_000; via = [ holding "Holdco" 10_000 ] } ];
   show
     entity
-    [ { stake_bps = 10_000; via = [ holding "A" 10_000; holding "B" 10_000; holding "C" 10_000 ] }
+    [ { stake_bps = 10_000
+      ; via = [ holding "A" 10_000; holding "B" 10_000; holding "C" 10_000 ]
+      }
     ];
-  show entity [ { stake_bps = 10_000; via = [ holding ~form:Trust "Family Trust" 10_000 ] } ];
+  show
+    entity
+    [ { stake_bps = 10_000; via = [ holding ~form:Trust "Family Trust" 10_000 ] } ];
   show
     entity
     [ { stake_bps = 10_000; via = [ holding ~country:"LU" "A" 10_000 ] }

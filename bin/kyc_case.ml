@@ -222,11 +222,15 @@ let kyb_requirements =
   Command.basic
     ~summary:"List the documents the default policy needs for a legal form"
     (let%map_open.Command jurisdiction =
-       flag "jurisdiction" (required string) ~doc:"CC country of registration (ISO alpha-2)"
+       flag
+         "jurisdiction"
+         (required string)
+         ~doc:"CC country of registration (ISO alpha-2)"
      and legal_form =
        flag
          "legal-form"
-         (required (Command.Arg_type.create (fun s -> Or_error.ok_exn (Legal_form.of_string s))))
+         (required
+            (Command.Arg_type.create (fun s -> Or_error.ok_exn (Legal_form.of_string s))))
          ~doc:"FORM e.g. private_limited_company, trust, other:NAME"
      in
      fun () ->

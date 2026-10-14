@@ -39,7 +39,8 @@ module Inputs : sig
     ; owner_countries : Risk.Country_risk.t
     (** worst of the beneficial owners' residences and the intermediates' jurisdictions *)
     ; ownership : Ownership.Opacity.t
-    ; pep : Pep.t option (** a beneficial owner, director or representative who is a PEP *)
+    ; pep : Pep.t option
+    (** a beneficial owner, director or representative who is a PEP *)
     ; adverse_media : Risk.Adverse_media.t (** about the entity *)
     ; products : Risk.Product.t list
     ; monthly_volume : Risk.Volume_band.t
@@ -68,7 +69,8 @@ module Edd_trigger : sig
   end
 
   type t = Stable.V1.t =
-    | Customer of Risk.Edd_trigger.t (** as for a natural person, from {!Inputs.to_customer} *)
+    | Customer of Risk.Edd_trigger.t
+    (** as for a natural person, from {!Inputs.to_customer} *)
     | Opaque_ownership (** bearer shares or nominee holders in the structure *)
   [@@deriving compare, equal, hash, sexp, quickcheck]
 end

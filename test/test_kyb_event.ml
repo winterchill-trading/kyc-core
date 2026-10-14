@@ -48,7 +48,8 @@ let%expect_test "stable digests" =
   print_endline [%bin_digest: Legal_entity.Stable.V1.t];
   print_endline [%bin_digest: Kyb_party.Stable.V1.t];
   print_endline [%bin_digest: Kyb_risk.Assessment.Stable.V1.t];
-  [%expect {|
+  [%expect
+    {|
     0fe5e688ded47f4cec552eda7a8e2fbd
     5cd040d35ae54568274b06ac38e98a56
     48303bce60ee41187f4111e24fb5ce82

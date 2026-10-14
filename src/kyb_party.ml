@@ -119,7 +119,9 @@ let validate t =
       ; Option.some_if
           ((not (has_role t Shareholder)) && not (List.is_empty t.chains))
           [%message "ownership chains without the shareholder role"]
-      ; (match List.map t.chains ~f:Ownership.Chain.validate |> Or_error.combine_errors with
+      ; (match
+           List.map t.chains ~f:Ownership.Chain.validate |> Or_error.combine_errors
+         with
          | Ok _ -> None
          | Error e -> Some (Error.sexp_of_t e))
       ]
@@ -127,7 +129,8 @@ let validate t =
   match errors with
   | [] -> Ok ()
   | errors ->
-    Or_error.error_s [%message "invalid party" ~id:(t.id : Customer_id.t) (errors : Sexp.t list)]
+    Or_error.error_s
+      [%message "invalid party" ~id:(t.id : Customer_id.t) (errors : Sexp.t list)]
 ;;
 
 let validate_all parties =
@@ -158,8 +161,6 @@ let needs_approved_case legal_form parties ~threshold_bps =
   in
   List.filter_map parties ~f:(fun p ->
     Option.some_if
-      (Set.mem owners p.id
-       || has_role p Director
-       || has_role p Authorised_representative)
+      (Set.mem owners p.id || has_role p Director || has_role p Authorised_representative)
       p.id)
 ;;

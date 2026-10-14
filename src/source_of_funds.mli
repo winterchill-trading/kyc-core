@@ -47,7 +47,8 @@ type t = Stable.V1.t =
   { sources : Source.t list
   ; description : string (** in the applicant's words *)
   ; monthly_volume : Risk.Volume_band.t (** expected, in EUR *)
-  ; counterparty_countries : Country.t list (** main countries money comes from or goes to *)
+  ; counterparty_countries : Country.t list
+  (** main countries money comes from or goes to *)
   }
 [@@deriving compare, equal, hash, sexp, quickcheck]
 

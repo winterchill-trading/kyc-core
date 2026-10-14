@@ -62,7 +62,10 @@ let%expect_test "shares through several chains add up" =
 let%expect_test "control by other means counts whatever the share" =
   show
     Private_limited_company
-    [ party "alice" [ Shareholder; Control_by_other_means "veto on budget" ] ~chains:(direct 100)
+    [ party
+        "alice"
+        [ Shareholder; Control_by_other_means "veto on budget" ]
+        ~chains:(direct 100)
     ];
   [%expect
     {|
@@ -123,7 +126,8 @@ let%expect_test "validation" =
     [ party "a" [ Shareholder ] ~chains:(direct 6000)
     ; party "b" [ Shareholder ] ~chains:(via 4000)
     ];
-  [%expect {|
+  [%expect
+    {|
     (Error ("invalid party" (id a) (errors ("a party needs a role"))))
     (Error ("invalid party" (id a) (errors ("repeated role"))))
     (Error

@@ -1,8 +1,8 @@
 open! Core
 
-module Change  = struct
-  module Stable  = struct
-    module V1  = struct
+module Change = struct
+  module Stable = struct
+    module V1 = struct
       type t =
         | Opened
         | Entity_updated of Legal_entity.Field.Stable.V1.t list
@@ -53,7 +53,7 @@ module Change  = struct
     | Status of
         { from : Kyb_status.t
         ; to_ : Kyb_status.t
-        ; round : int 
+        ; round : int
         }
     | Risk_assessed of
         { score : int
@@ -82,9 +82,9 @@ module Change  = struct
   ;;
 end
 
-module Entry  = struct
-  module Stable  = struct
-    module V1  = struct
+module Entry = struct
+  module Stable = struct
+    module V1 = struct
       type t =
         { at : Timestamp.Stable.V1.t
         ; actor : Actor.Stable.V1.t

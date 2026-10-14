@@ -27,7 +27,10 @@ let kind_gen : Kyb_event.Kind.t G.t =
                  ; 0.05, Close "ended"
                  ]
                ~f:(fun (w, t) -> w, G.return t))
-        and round = G.weighted_union [ 4., G.return None; 1., G.map (Int.gen_incl 0 3) ~f:Option.some ] in
+        and round =
+          G.weighted_union
+            [ 4., G.return None; 1., G.map (Int.gen_incl 0 3) ~f:Option.some ]
+        in
         Kyb_event.Kind.Status_changed { transition; round } )
     ; ( 2.
       , let%map id = party
@@ -39,7 +42,8 @@ let kind_gen : Kyb_event.Kind.t G.t =
               ; Verifying
               ; Blocked { reason = "match"; previous = Approved }
               ; Rejected "no"
-              ] in
+              ]
+        in
         Kyb_event.Kind.Party_case_changed { party = Customer_id.of_string id; status } )
     ; ( 2.
       , let%map n = Int.gen_incl 0 (List.length docs - 1) in
@@ -54,7 +58,8 @@ let kind_gen : Kyb_event.Kind.t G.t =
     ; 0.5, G.return (Kyb_event.Kind.Entity_updated Kyb_fixtures.entity)
     ; ( 0.3
       , let%map industry = G.of_list [ "62.01"; "64.19"; "47.11" ] in
-        Kyb_event.Kind.Entity_updated { Kyb_fixtures.entity with industry = Some industry } )
+        Kyb_event.Kind.Entity_updated
+          { Kyb_fixtures.entity with industry = Some industry } )
     ; ( 0.5
       , let%map n = Int.gen_incl 1 3 in
         Kyb_event.Kind.Parties_set (List.take Kyb_fixtures.parties n) )
@@ -62,9 +67,12 @@ let kind_gen : Kyb_event.Kind.t G.t =
     ; ( 1.
       , let%map inputs =
           G.weighted_union
-            [ 3., G.return Kyb_risk.Inputs.baseline; 1., Kyb_risk.Inputs.quickcheck_generator ]
+            [ 3., G.return Kyb_risk.Inputs.baseline
+            ; 1., Kyb_risk.Inputs.quickcheck_generator
+            ]
         in
-        Kyb_event.Kind.Risk_assessed (Kyb_risk.assess Kyb_risk.Model.default inputs ~at:t0) )
+        Kyb_event.Kind.Risk_assessed
+          (Kyb_risk.assess Kyb_risk.Model.default inputs ~at:t0) )
     ; 0.3, G.return Kyb_event.Kind.Senior_approval
     ; 0.3, G.return Kyb_event.Kind.Periodic_review_completed
     ; 0.05, G.return (Kyb_event.Kind.Opened Kyb_fixtures.entity)
@@ -103,10 +111,15 @@ let opened =
   }
 ;;
 
-let apply_lenient case e = Kyb_case.apply case e |> Result.ok |> Option.value ~default:case
+let apply_lenient case e =
+  Kyb_case.apply case e |> Result.ok |> Option.value ~default:case
+;;
 
 let replay events =
-  List.fold (opened :: events) ~init:(Kyb_case.create Kyb_fixtures.entity_id) ~f:apply_lenient
+  List.fold
+    (opened :: events)
+    ~init:(Kyb_case.create Kyb_fixtures.entity_id)
+    ~f:apply_lenient
 ;;
 
 let%test_unit "applying the same event twice equals applying it once" =
@@ -152,7 +165,9 @@ let%test_unit "rounds never go down and the applicant view never shows a block" 
     ~sexp_of:[%sexp_of: Kyb_event.t list]
     ~f:(fun events ->
       ignore
-        (List.fold (opened :: events) ~init:(Kyb_case.create Kyb_fixtures.entity_id)
+        (List.fold
+           (opened :: events)
+           ~init:(Kyb_case.create Kyb_fixtures.entity_id)
            ~f:(fun case e ->
              let next = apply_lenient case e in
              assert (Kyb_case.round next >= Kyb_case.round case);
@@ -187,6 +202,8 @@ let%expect_test "random streams pass through every status" =
         match entry.change with
         | Status { to_; _ } -> Hash_set.add seen (name to_)
         | _ -> ()));
-  print_s [%sexp (Hash_set.to_list seen |> List.sort ~compare:String.compare : string list)];
-  [%expect {| (Approved Blocked Closed Draft In_review More_information Rejected Submitted) |}]
+  print_s
+    [%sexp (Hash_set.to_list seen |> List.sort ~compare:String.compare : string list)];
+  [%expect
+    {| (Approved Blocked Closed Draft In_review More_information Rejected Submitted) |}]
 ;;

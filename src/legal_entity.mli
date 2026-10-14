@@ -1,6 +1,6 @@
 (** A business applicant as registered: name, registration number, jurisdiction, legal
-    form and addresses. Company register data is public, so nothing here is {!Pii.t};
-    the people linked to the entity have their own {!Kyc_case}s.
+    form and addresses. Company register data is public, so nothing here is {!Pii.t}; the
+    people linked to the entity have their own {!Kyc_case}s.
 
     Only [legal_name], [jurisdiction] and [legal_form] are needed to open a case; the rest
     may be filled in while drafting, and {!missing_fields} says what submission still

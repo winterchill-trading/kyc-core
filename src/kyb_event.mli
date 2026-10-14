@@ -38,16 +38,15 @@ module Kind : sig
     | Party_case_changed of
         { party : Customer_id.t
         ; status : Status.t
-        }
-    (** the linked person's own case moved; reported by the platform *)
+        } (** the linked person's own case moved; reported by the platform *)
     | Document_added of Kyb_document.t
     | Document_removed of Document_id.t
     | Source_of_funds_declared of Source_of_funds.t
     | Status_changed of
         { transition : Kyb_status.Transition.t
         ; round : int option
-        (** the submission round a provider decision refers to; a decision about an
-            older round is refused. [Submit] may name the round it opens. *)
+        (** the submission round a provider decision refers to; a decision about an older
+            round is refused. [Submit] may name the round it opens. *)
         }
     | Risk_assessed of Kyb_risk.Assessment.t
     | Senior_approval (** EDD sign-off; the note is the rationale *)

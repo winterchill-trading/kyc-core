@@ -165,7 +165,8 @@ let missing_for_submission t =
         ; Option.some_if (List.is_empty (beneficial_owners t)) Kyb_item.Beneficial_owners
         ]
     @ List.map (missing_documents t) ~f:(fun r -> Kyb_item.Document r)
-    @ Option.to_list (Option.some_if (Option.is_none t.source_of_funds) Kyb_item.Source_of_funds)
+    @ Option.to_list
+        (Option.some_if (Option.is_none t.source_of_funds) Kyb_item.Source_of_funds)
 ;;
 
 let parties_pending t =
@@ -301,7 +302,13 @@ let applicant_view t : Applicant_view.t =
     | Rejected _ -> Declined
     | Closed _ -> Closed
   in
-  let blocked = Kyb_status.(function Blocked _ -> true | _ -> false) t.status in
+  let blocked =
+    Kyb_status.(
+      function
+      | Blocked _ -> true
+      | _ -> false)
+      t.status
+  in
   { status
   ; round = t.round
   ; requested = (if blocked then [] else requested t)
@@ -346,7 +353,8 @@ let check_round t (transition : Kyb_status.Transition.t) round =
   | Some r, Submit when r = t.round + 1 -> Ok ()
   | Some r, Submit ->
     Or_error.error_s
-      [%message "a submission opens the next round" ~round:(r : int) ~current:(t.round : int)]
+      [%message
+        "a submission opens the next round" ~round:(r : int) ~current:(t.round : int)]
   | Some r, _ when r = t.round -> Ok ()
   | Some r, _ ->
     Or_error.error_s
@@ -381,7 +389,12 @@ let step_event t (event : Kyb_event.t) : (t * Kyb_audit.Change.t list) Or_error.
         Ok ()
     in
     let decision outcome =
-      { Decision.round = t.round; outcome; at = event.at; actor = event.actor; note = event.note }
+      { Decision.round = t.round
+      ; outcome
+      ; at = event.at
+      ; actor = event.actor
+      ; note = event.note
+      }
       :: t.decisions
     in
     let t' =
@@ -389,7 +402,8 @@ let step_event t (event : Kyb_event.t) : (t * Kyb_audit.Change.t list) Or_error.
       | Submit -> { t with round = t.round + 1; submitted_at = Some event.at }
       | Approve ->
         { t with last_review_at = Some event.at; decisions = decision Approved }
-      | Request_information items -> { t with decisions = decision (More_information items) }
+      | Request_information items ->
+        { t with decisions = decision (More_information items) }
       | Reject reason ->
         { t with refused_at = Some event.at; decisions = decision (Rejected reason) }
       | Close _ -> { t with closed_at = Some event.at }
@@ -410,8 +424,11 @@ let step_event t (event : Kyb_event.t) : (t * Kyb_audit.Change.t list) Or_error.
      | fields ->
        if t.round > 0 && List.mem fields Jurisdiction ~equal:Legal_entity.Field.equal
        then
-         Or_error.error_s [%message "the jurisdiction is fixed after the first submission"]
-       else Ok (one ({ t with entity = Some entity }, Kyb_audit.Change.Entity_updated fields)))
+         Or_error.error_s
+           [%message "the jurisdiction is fixed after the first submission"]
+       else
+         Ok
+           (one ({ t with entity = Some entity }, Kyb_audit.Change.Entity_updated fields)))
   | Parties_set parties, Some _, _ ->
     let%bind () = need_editable t ~what:"change the parties" in
     let%bind () = Kyb_party.validate_all parties in
@@ -441,7 +458,9 @@ let step_event t (event : Kyb_event.t) : (t * Kyb_audit.Change.t list) Or_error.
     let%bind () = need_editable t ~what:"add a document" in
     let%bind () = Kyb_document.validate document in
     if Map.mem t.documents document.id
-    then Or_error.error_s [%message "document already recorded" ~id:(document.id : Document_id.t)]
+    then
+      Or_error.error_s
+        [%message "document already recorded" ~id:(document.id : Document_id.t)]
     else if Option.exists document.party ~f:(fun id ->
               not (List.exists t.parties ~f:(fun p -> Customer_id.equal p.id id)))
     then Or_error.error_s [%message "document about someone who is not a party"]
@@ -450,7 +469,8 @@ let step_event t (event : Kyb_event.t) : (t * Kyb_audit.Change.t list) Or_error.
         (one
            ( { t with documents = Map.set t.documents ~key:document.id ~data:document }
            , Kyb_audit.Change.Document_added
-               { document_id = document.id; kind = document.kind; party = document.party } ))
+               { document_id = document.id; kind = document.kind; party = document.party }
+           ))
   | Document_removed id, Some _, _ ->
     let%bind () = need_editable t ~what:"remove a document" in
     if not (Map.mem t.documents id)

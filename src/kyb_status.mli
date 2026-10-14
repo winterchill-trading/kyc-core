@@ -13,9 +13,9 @@
       any but Closed --- Close ----------------> Closed (final)
     v}
 
-    A decision may come straight from [Submitted]: a reviewer need not announce the
-    review first. [Block] and [Unblock] need an [Operator]. Rounds and the guards that
-    need the whole case (completeness, linked people, risk) are checked by {!Kyb_case}. *)
+    A decision may come straight from [Submitted]: a reviewer need not announce the review
+    first. [Block] and [Unblock] need an [Operator]. Rounds and the guards that need the
+    whole case (completeness, linked people, risk) are checked by {!Kyb_case}. *)
 
 open! Core
 

@@ -54,7 +54,8 @@ let%expect_test "every transition from every status, as an operator" =
         | Error _ -> None)
     in
     printf "%-20s %s\n" name (String.concat ~sep:" " row));
-  [%expect {|
+  [%expect
+    {|
     Submit               Draft->Submitted More_information->Submitted
     Start_review         Submitted->In_review
     Request_information  Submitted->More_information In_review->More_information Approved->More_information
@@ -69,11 +70,13 @@ let%expect_test "every transition from every status, as an operator" =
 let%expect_test "guards" =
   let show r = print_s [%sexp (r : S.t Or_error.t)] in
   show (S.apply Submitted (Block "x") ~actor:System);
-  show (S.apply (Blocked { reason = "x"; previous = Draft }) Unblock ~actor:(Provider "p"));
+  show
+    (S.apply (Blocked { reason = "x"; previous = Draft }) Unblock ~actor:(Provider "p"));
   show (S.apply Submitted (Request_information []) ~actor:op);
   show (S.apply Submitted (Reject " ") ~actor:op);
   show (S.apply (Blocked { reason = "x"; previous = In_review }) Unblock ~actor:op);
-  [%expect {|
+  [%expect
+    {|
     (Error "only an operator may block")
     (Error "only an operator may unblock")
     (Error "nothing requested")
@@ -90,6 +93,8 @@ let%test_unit "Closed is final and Unblock restores the status before Block" =
       match from, S.apply from tr ~actor:op with
       | Closed _, result -> assert (Result.is_error result)
       | _, Ok (Blocked { previous; _ } as blocked) ->
-        [%test_result: S.t Or_error.t] (S.apply blocked Unblock ~actor:op) ~expect:(Ok previous)
+        [%test_result: S.t Or_error.t]
+          (S.apply blocked Unblock ~actor:op)
+          ~expect:(Ok previous)
       | _ -> ())
 ;;

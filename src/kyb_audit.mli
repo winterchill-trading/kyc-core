@@ -105,8 +105,7 @@ val add : t -> Entry.t -> t
 (** Oldest first. *)
 val entries : t -> Entry.t list
 
-(** Oldest first, only what the audience may see; the applicant's copy has no [why]
-    notes. *)
+(** Oldest first, only what the audience may see; the applicant's copy has no [why] notes. *)
 val for_audience : t -> Visibility.Audience.t -> Entry.t list
 
 val length : t -> int

@@ -13,12 +13,15 @@ let%expect_test "opening checks the entity and the jurisdiction" =
     apply_all (Kyb_case.create ~policy entity_id) [ event (Opened entity) ]
   in
   let _ : Kyb_case.t =
-    apply_all (Kyb_case.create entity_id) [ event (Opened { entity with legal_name = " x" }) ]
+    apply_all
+      (Kyb_case.create entity_id)
+      [ event (Opened { entity with legal_name = " x" }) ]
   in
   let case = opened () in
   show_case case;
   print_s [%sexp (Kyb_case.applicant_view case : Kyb_case.Applicant_view.t)];
-  [%expect {|
+  [%expect
+    {|
     ((event kyb-1) ("jurisdiction not covered" (jurisdiction GB)))
     ((event kyb-2) ("invalid legal entity" (errors ("invalid legal name"))))
     ((status Draft) (round 0) (band ())
@@ -64,9 +67,12 @@ let%expect_test "drafting: entity, parties, documents, source of funds" =
       (List.tl_exn all_documents @ [ event (Source_of_funds_declared source_of_funds) ])
   in
   show_case case;
-  let case = apply_all case [ event (Document_removed (Document_id.of_string "doc-poa")) ] in
+  let case =
+    apply_all case [ event (Document_removed (Document_id.of_string "doc-poa")) ]
+  in
   show_case case;
-  [%expect {|
+  [%expect
+    {|
     ((event kyb-3) "entity update changes nothing")
     ((event kyb-6) "document about someone who is not a party")
     ((event kyb-7) ("document already recorded" (id doc-coi)))
@@ -92,7 +98,8 @@ let%expect_test "submit needs a complete case and opens round 1" =
   let case = apply_all case [ status Submit ] in
   show_case case;
   show_follow_ups case ~now:"2026-10-14 00:00:00Z";
-  [%expect {|
+  [%expect
+    {|
     ((event kyb-2)
      ("KYB case incomplete"
       (missing
@@ -130,7 +137,8 @@ let%expect_test "nothing changes while under review; jurisdiction fixed after su
       ]
   in
   show_case case;
-  [%expect {|
+  [%expect
+    {|
     ((event kyb-12)
      ("the case cannot be changed now" (what "update the entity")
       (status Submitted)))
@@ -176,7 +184,8 @@ let%expect_test "more information, resubmission and stale rounds" =
   in
   show_case case;
   print_s [%sexp (Kyb_case.decisions case : Kyb_case.Decision.t list)];
-  [%expect {|
+  [%expect
+    {|
     ((status
       (More_information
        ((Document ((kind Source_of_funds_evidence) (party ())))
@@ -224,7 +233,8 @@ let%expect_test "approval needs the people verified and a risk assessment" =
   in
   show_case case;
   print_s [%sexp (Kyb_case.next_review_due case : Timestamp.t option)];
-  [%expect {|
+  [%expect
+    {|
     ((event kyb-12) ("linked people not verified" (pending (alice bob carol))))
     ((status Under_review) (round 1) (requested ()) (missing ())
      (parties_pending (bob carol)) (reason ()))
@@ -237,7 +247,9 @@ let%expect_test "approval needs the people verified and a risk assessment" =
 ;;
 
 let%expect_test "EDD: opaque ownership needs a senior sign-off" =
-  let case = ready_for_approval ~inputs:{ Kyb_risk.Inputs.baseline with ownership = Opaque } () in
+  let case =
+    ready_for_approval ~inputs:{ Kyb_risk.Inputs.baseline with ownership = Opaque } ()
+  in
   print_s [%sexp (Kyb_case.cdd_level case ~now:t0 : Cdd_level.t)];
   let case =
     apply_all
@@ -250,7 +262,8 @@ let%expect_test "EDD: opaque ownership needs a senior sign-off" =
       ]
   in
   show_case case;
-  [%expect {|
+  [%expect
+    {|
     Enhanced
     ((event kyb-16)
      ("enhanced due diligence outstanding"
@@ -277,7 +290,8 @@ let%expect_test "rejection starts retention" =
   print_s [%sexp (Kyb_case.retain_until case : Timestamp.t option)];
   show_follow_ups case ~now:"2032-01-01 00:00:00Z";
   print_s [%sexp (Kyb_case.applicant_view case : Kyb_case.Applicant_view.t)];
-  [%expect {|
+  [%expect
+    {|
     ((status (Rejected outside_risk_appetite)) (round 1) (band (Low))
      (missing ()) (parties_pending ()))
     ("2031-10-12 09:16:00Z")
@@ -293,7 +307,9 @@ let%expect_test "block and unblock: the applicant only sees Under_review" =
     apply_all
       case
       [ status ~actor:provider (Block "x")
-      ; party_case "bob" (Blocked { reason = "confirmed sanctions match"; previous = Approved })
+      ; party_case
+          "bob"
+          (Blocked { reason = "confirmed sanctions match"; previous = Approved })
       ; status ~note:"sanctions match on an owner" (Block "sanctions")
       ]
   in
@@ -301,7 +317,9 @@ let%expect_test "block and unblock: the applicant only sees Under_review" =
   let case = apply_all case [ status Unblock ] in
   print_s [%sexp (Kyb_case.applicant_view case : Kyb_case.Applicant_view.t)];
   let audit audience =
-    List.map (Kyb_audit.for_audience (Kyb_case.audit case) audience) ~f:(fun e -> e.change)
+    List.map
+      (Kyb_audit.for_audience (Kyb_case.audit case) audience)
+      ~f:(fun e -> e.change)
     |> List.filter ~f:(function
       | Kyb_audit.Change.Document_added _ -> false
       | _ -> true)
@@ -309,7 +327,8 @@ let%expect_test "block and unblock: the applicant only sees Under_review" =
   print_s [%message "customer" ~_:(audit Customer : Kyb_audit.Change.t list)];
   print_s [%message "support" ~_:(audit Support : Kyb_audit.Change.t list)];
   print_s [%message "compliance" ~_:(audit Compliance : Kyb_audit.Change.t list)];
-  [%expect {|
+  [%expect
+    {|
     ((event kyb-16) "only an operator may block")
     ((status Under_review) (round 1) (requested ()) (missing ())
      (parties_pending ()) (reason ()))
@@ -373,7 +392,8 @@ let%expect_test "periodic review" =
   in
   show_case case;
   print_s [%sexp (Kyb_case.last_review_at case : Timestamp.t option)];
-  [%expect {|
+  [%expect
+    {|
     ((Periodic_review_due "2031-10-12 09:16:00Z"))
     ((event kyb-17) "a review needs a risk assessment since the last review")
     ((event kyb-23)
@@ -385,7 +405,9 @@ let%expect_test "periodic review" =
 ;;
 
 let%expect_test "closing freezes the case" =
-  let case = apply_all (ready_for_approval ()) [ status Approve; status (Close "ended") ] in
+  let case =
+    apply_all (ready_for_approval ()) [ status Approve; status (Close "ended") ]
+  in
   let case =
     apply_all
       case
@@ -397,7 +419,8 @@ let%expect_test "closing freezes the case" =
   in
   show_case case;
   print_s [%sexp (Kyb_case.retain_until case : Timestamp.t option)];
-  [%expect {|
+  [%expect
+    {|
     ((event kyb-18) ("case is closed" (status (Closed ended))))
     ((event kyb-19) ("case is closed" (status (Closed ended))))
     ((event kyb-20) ("case is closed" (status (Closed ended))))
@@ -413,17 +436,26 @@ let%expect_test "idempotency and foreign events" =
   let case = opened () in
   let e = number (event (Source_of_funds_declared source_of_funds)) in
   let case = Kyb_case.apply case e |> Or_error.ok_exn in
-  print_s [%sexp (Kyb_case.apply case e |> Or_error.map ~f:(Kyb_case.equal case) : bool Or_error.t)];
   print_s
     [%sexp
-      (Kyb_case.apply case { e with note = Some "changed" } |> Or_error.map ~f:(fun _ -> ())
-       : unit Or_error.t)];
+      (Kyb_case.apply case e |> Or_error.map ~f:(Kyb_case.equal case) : bool Or_error.t)];
   print_s
     [%sexp
-      (Kyb_case.apply case { e with id = Event_id.of_string "other"; entity_id = Entity_id.of_string "ent-2" }
+      (Kyb_case.apply case { e with note = Some "changed" }
        |> Or_error.map ~f:(fun _ -> ())
        : unit Or_error.t)];
-  [%expect {|
+  print_s
+    [%sexp
+      (Kyb_case.apply
+         case
+         { e with
+           id = Event_id.of_string "other"
+         ; entity_id = Entity_id.of_string "ent-2"
+         }
+       |> Or_error.map ~f:(fun _ -> ())
+       : unit Or_error.t)];
+  [%expect
+    {|
     (Ok true)
     (Error ("event id already applied with different content" (id kyb-2)))
     (Error ("event is for another entity" (case ent-1) (event ent-2)))

@@ -91,8 +91,8 @@ let apply t (transition : Transition.t) ~(actor : Actor.t) =
   | Reject reason, (Submitted | In_review | More_information _) ->
     let%map () = need_text "reject" reason in
     Rejected reason
-  | Block reason, (Draft | Submitted | In_review | More_information _ | Approved | Rejected _)
-    ->
+  | ( Block reason
+    , (Draft | Submitted | In_review | More_information _ | Approved | Rejected _) ) ->
     if not (Actor.is_operator actor)
     then Or_error.error_s [%message "only an operator may block"]
     else (
@@ -102,7 +102,14 @@ let apply t (transition : Transition.t) ~(actor : Actor.t) =
     if Actor.is_operator actor
     then Ok previous
     else Or_error.error_s [%message "only an operator may unblock"]
-  | Close reason, (Draft | Submitted | In_review | More_information _ | Approved | Rejected _ | Blocked _) ->
+  | ( Close reason
+    , ( Draft
+      | Submitted
+      | In_review
+      | More_information _
+      | Approved
+      | Rejected _
+      | Blocked _ ) ) ->
     let%map () = need_text "close" reason in
     Closed reason
   | ( ( Submit

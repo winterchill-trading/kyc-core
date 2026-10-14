@@ -25,7 +25,8 @@ module Role : sig
 
   type t = Stable.V1.t =
     | Director (** member of the management body *)
-    | Authorised_representative (** may act for the entity, e.g. under a power of attorney *)
+    | Authorised_representative
+    (** may act for the entity, e.g. under a power of attorney *)
     | Shareholder (** holds shares or voting rights, directly or through chains *)
     | Control_by_other_means of string
     (** e.g. a veto right or the power to appoint directors; the string says how *)
@@ -77,11 +78,16 @@ end
     - ownership at or above [threshold_bps] (2500 under AMLR Art. 52) summed over chains;
     - control by other means, whatever the share;
     - for a trust, every settlor, trustee, protector and beneficiary;
-    - only when none of those exists, the senior managing officials (AMLD Art. 3(6)(a)(ii)). *)
-val beneficial_owners : Legal_form.t -> t list -> threshold_bps:int -> (t * Basis.t list) list
+    - only when none of those exists, the senior managing officials (AMLD Art.
+      3(6)(a)(ii)). *)
+val beneficial_owners
+  :  Legal_form.t
+  -> t list
+  -> threshold_bps:int
+  -> (t * Basis.t list) list
 
-(** At least one role, no repeated role, chains exactly when the party is a
-    [Shareholder], valid chains. *)
+(** At least one role, no repeated role, chains exactly when the party is a [Shareholder],
+    valid chains. *)
 val validate : t -> unit Or_error.t
 
 (** Every party valid, at most {!max_parties}, no id twice, and effective shares summing
@@ -93,6 +99,10 @@ val max_parties : int
 
 (** Parties whose own KYC case must be approved before the business case is: beneficial
     owners, directors and authorised representatives. *)
-val needs_approved_case : Legal_form.t -> t list -> threshold_bps:int -> Customer_id.t list
+val needs_approved_case
+  :  Legal_form.t
+  -> t list
+  -> threshold_bps:int
+  -> Customer_id.t list
 
 val has_role : t -> Role.t -> bool

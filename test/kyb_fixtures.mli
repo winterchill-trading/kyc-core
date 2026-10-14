@@ -29,8 +29,8 @@ val assessed : ?inputs:Kyb_risk.Inputs.t -> unit -> draft
 (** A UK private company, registered, with an address and an industry. *)
 val entity : Legal_entity.t
 
-(** alice: director owning 60 %; bob: 40 % through a Luxembourg holding; carol:
-    authorised representative. *)
+(** alice: director owning 60 %; bob: 40 % through a Luxembourg holding; carol: authorised
+    representative. *)
 val parties : Kyb_party.t list
 
 val document : ?party:string -> string -> Kyb_document.Kind.t -> draft

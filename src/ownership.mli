@@ -33,7 +33,8 @@ module Intermediate : sig
     ; jurisdiction : Country.t
     ; legal_form : Legal_form.t
     ; registration_number : string option
-    ; stake_bps : int (** its stake in the next entity towards the applicant, 1 to 10000 *)
+    ; stake_bps : int
+    (** its stake in the next entity towards the applicant, 1 to 10000 *)
     ; nominee : bool (** it holds as a nominee for someone not named *)
     ; bearer_shares : bool (** it has issued bearer shares *)
     }
@@ -71,9 +72,9 @@ end
 val max_layers : int
 
 module Share : sig
-  (** An ownership fraction in parts per 10{^12}. Products of whole basis points are exact
-      through two intermediates; deeper chains round down by at most one part per layer,
-      which only matters within 10{^-12} of a threshold. *)
+  (** An ownership fraction in parts per 10[{^12}]. Products of whole basis points are
+      exact through two intermediates; deeper chains round down by at most one part per
+      layer, which only matters within 10[{^-12}] of a threshold. *)
   type t = private int [@@deriving compare, equal, hash, sexp_of]
 
   include Comparable.S_plain with type t := t

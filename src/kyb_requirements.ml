@@ -74,7 +74,8 @@ let check_entity t (entity : Legal_entity.t) =
   if not j.covered
   then
     Or_error.error_s
-      [%message "jurisdiction not covered" ~jurisdiction:(entity.jurisdiction : Country.t)]
+      [%message
+        "jurisdiction not covered" ~jurisdiction:(entity.jurisdiction : Country.t)]
   else if (not (List.is_empty j.legal_forms))
           && not (List.mem j.legal_forms entity.legal_form ~equal:Legal_form.equal)
   then

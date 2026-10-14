@@ -82,7 +82,8 @@ let validate t ~today =
             || String.length n > 200
             || (not (String.equal n (String.strip n)))
             (* Bytes above 0x7f are UTF-8 and allowed; only ASCII controls are refused. *)
-            || String.exists n ~f:(fun c -> Char.to_int c < 0x20 || Char.to_int c = 0x7f))
+            || String.exists n ~f:(fun c -> Char.to_int c < 0x20 || Char.to_int c = 0x7f)
+           )
            [%message "invalid legal name"])
       ; Option.bind t.registration_number ~f:(fun r ->
           Option.some_if
@@ -103,11 +104,13 @@ let changed_fields a b =
   let diff field eq get = Option.some_if (not (eq (get a) (get b))) field in
   List.filter_opt
     [ diff Field.Legal_name String.equal (fun t -> t.legal_name)
-    ; diff Field.Registration_number [%equal: string option] (fun t -> t.registration_number)
+    ; diff Field.Registration_number [%equal: string option] (fun t ->
+        t.registration_number)
     ; diff Field.Jurisdiction Country.equal (fun t -> t.jurisdiction)
     ; diff Field.Legal_form Legal_form.equal (fun t -> t.legal_form)
     ; diff Field.Incorporation_date [%equal: Date.t option] (fun t -> t.incorporated_on)
-    ; diff Field.Registered_address [%equal: Address.t option] (fun t -> t.registered_address)
+    ; diff Field.Registered_address [%equal: Address.t option] (fun t ->
+        t.registered_address)
     ; diff Field.Business_address [%equal: Address.t option] (fun t -> t.business_address)
     ; diff Field.Industry [%equal: string option] (fun t -> t.industry)
     ; diff Field.Bearer_shares Bool.equal (fun t -> t.bearer_shares)

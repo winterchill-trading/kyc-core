@@ -51,7 +51,12 @@
  (action
   (with-stdout-to
    cli-kyb.output
-   (run %{exe:../bin/kyc_case.exe} kyb replay -audit ../examples/kyb-approved.sexp))))
+   (run
+    %{exe:../bin/kyc_case.exe}
+    kyb
+    replay
+    -audit
+    ../examples/kyb-approved.sexp))))
 
 (rule
  (alias runtest)

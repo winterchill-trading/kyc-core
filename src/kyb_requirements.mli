@@ -29,21 +29,23 @@ end
 type t =
   { by_legal_form : (Legal_form.t * Kyb_document.Kind.t list) list
   ; other_forms : Kyb_document.Kind.t list (** for forms missing from [by_legal_form] *)
-  ; layered_ownership : Kyb_document.Kind.t list (** when any owner holds through an intermediate *)
+  ; layered_ownership : Kyb_document.Kind.t list
+  (** when any owner holds through an intermediate *)
   ; per_representative : Kyb_document.Kind.t list
   (** for each authorised representative who is not a director *)
   ; jurisdictions : Jurisdiction.t list
-  ; unlisted_covered : bool (** whether a country missing from [jurisdictions] is covered *)
+  ; unlisted_covered : bool
+  (** whether a country missing from [jurisdictions] is covered *)
   }
 [@@deriving compare, equal, sexp]
 
 (** Companies: certificate of incorporation, articles, shareholder register (private) or
     register extract (public), register of directors. Partnerships: register extract and
-    partnership agreement. Sole traders: register extract. Cooperatives and
-    associations: register extract and articles. Foundations: register extract and
-    charter. Trusts: trust deed. Others: register extract and articles. An ownership
-    chart for layered ownership, a power of attorney per representative. No
-    jurisdictions listed and every country covered. *)
+    partnership agreement. Sole traders: register extract. Cooperatives and associations:
+    register extract and articles. Foundations: register extract and charter. Trusts:
+    trust deed. Others: register extract and articles. An ownership chart for layered
+    ownership, a power of attorney per representative. No jurisdictions listed and every
+    country covered. *)
 val default : t
 
 (** The country's entry, or a covered-per-[unlisted_covered] entry with no extras. *)

@@ -90,9 +90,7 @@ module Edd_trigger = struct
 end
 
 let opaque (i : Inputs.t) =
-  Option.some_if
-    (Ownership.Opacity.equal i.ownership Opaque)
-    Edd_trigger.Opaque_ownership
+  Option.some_if (Ownership.Opacity.equal i.ownership Opaque) Edd_trigger.Opaque_ownership
 ;;
 
 let customer triggers = List.map triggers ~f:(fun t -> Edd_trigger.Customer t)
@@ -192,7 +190,8 @@ module Assessment = struct
   let validate t =
     if t.score < 0 || t.score > 100
     then Or_error.error_s [%message "risk score out of range" ~score:(t.score : int)]
-    else if not (Risk.Band.equal t.computed_band (band_for ~score:t.score ~floors:t.floors))
+    else if not
+              (Risk.Band.equal t.computed_band (band_for ~score:t.score ~floors:t.floors))
     then
       Or_error.error_s
         [%message

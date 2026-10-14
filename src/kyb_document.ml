@@ -97,7 +97,8 @@ let validate t =
       ; Option.bind t.sha256 ~f:(fun h ->
           Option.some_if
             (String.length h <> 64
-             || String.exists h ~f:(fun c -> not (Char.is_digit c || Char.between c ~low:'a' ~high:'f')))
+             || String.exists h ~f:(fun c ->
+               not (Char.is_digit c || Char.between c ~low:'a' ~high:'f')))
             [%message "invalid sha256"])
       ]
   in

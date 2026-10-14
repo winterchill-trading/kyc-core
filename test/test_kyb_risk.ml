@@ -11,7 +11,8 @@ let show (inputs : K.Inputs.t) =
     [%message
       ""
         ~points:
-          (List.filter (K.Model.points K.Model.default inputs ~on) ~f:(fun (_, p) -> p > 0)
+          (List.filter (K.Model.points K.Model.default inputs ~on) ~f:(fun (_, p) ->
+             p > 0)
            : (string * int) list)
         ~score:(a.score : int)
         ~floors:(a.floors : K.Edd_trigger.t list)
@@ -28,7 +29,8 @@ let%expect_test "entity factors" =
   show { K.Inputs.baseline with cash_intensive = true; places_of_business = Elevated };
   show { K.Inputs.baseline with ownership = Opaque };
   show { K.Inputs.baseline with owner_countries = High_risk_third_country };
-  [%expect {|
+  [%expect
+    {|
     ((points ((sector 15) (volume 5) (channel 5) (ownership 15))) (score 40)
      (floors ()) (band Medium))
     ((points ((country 20) (volume 5) (channel 5) (cash_intensive 15)))
@@ -54,7 +56,8 @@ let%expect_test "overrides cannot go below a floor" =
       (K.override a ~band:High ~reason:"sector news" ~by ~at
        |> Or_error.map ~f:K.Assessment.band
        : Risk.Band.t Or_error.t)];
-  [%expect {|
+  [%expect
+    {|
     (Error
      ("a hard floor keeps the band High" (floors (Opaque_ownership))
       (requested Low)))
@@ -72,6 +75,9 @@ let%test_unit "assessments validate and floors force High" =
 let%test_unit "more opaque ownership never lowers the score" =
   Quickcheck.test K.Inputs.quickcheck_generator ~sexp_of:K.Inputs.sexp_of_t ~f:(fun i ->
     let score o = K.Model.score K.Model.default { i with ownership = o } ~on in
-    List.iter (List.zip_exn (List.drop_last_exn Ownership.Opacity.all) (List.tl_exn Ownership.Opacity.all))
+    List.iter
+      (List.zip_exn
+         (List.drop_last_exn Ownership.Opacity.all)
+         (List.tl_exn Ownership.Opacity.all))
       ~f:(fun (lo, hi) -> assert (score lo <= score hi)))
 ;;

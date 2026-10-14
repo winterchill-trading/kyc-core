@@ -32,7 +32,10 @@ let party_case id status =
 ;;
 
 let assessed ?(inputs = Kyb_risk.Inputs.baseline) () n =
-  event ~actor:op_a (Risk_assessed (Kyb_risk.assess Kyb_risk.Model.default inputs ~at:(time n))) n
+  event
+    ~actor:op_a
+    (Risk_assessed (Kyb_risk.assess Kyb_risk.Model.default inputs ~at:(time n)))
+    n
 ;;
 
 let gb = Country.of_string "GB"
@@ -80,7 +83,10 @@ let parties : Kyb_party.t list =
           }
         ]
     }
-  ; { id = Customer_id.of_string "carol"; roles = [ Authorised_representative ]; chains = [] }
+  ; { id = Customer_id.of_string "carol"
+    ; roles = [ Authorised_representative ]
+    ; chains = []
+    }
   ]
 ;;
 

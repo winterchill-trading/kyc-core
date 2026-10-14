@@ -75,7 +75,8 @@ module Chain = struct
     in
     match errors with
     | [] -> Ok ()
-    | errors -> Or_error.error_s [%message "invalid ownership chain" (errors : Sexp.t list)]
+    | errors ->
+      Or_error.error_s [%message "invalid ownership chain" (errors : Sexp.t list)]
   ;;
 end
 
@@ -147,7 +148,9 @@ let opacity (entity : Legal_entity.t) chains =
   let intermediates = List.concat_map chains ~f:(fun (c : Chain.t) -> c.via) in
   let foreign =
     List.filter_map intermediates ~f:(fun i ->
-      Option.some_if (not (Country.equal i.jurisdiction entity.jurisdiction)) i.jurisdiction)
+      Option.some_if
+        (not (Country.equal i.jurisdiction entity.jurisdiction))
+        i.jurisdiction)
     |> List.dedup_and_sort ~compare:Country.compare
   in
   if entity.bearer_shares
