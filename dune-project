@@ -15,7 +15,8 @@
 
 (package
  (name kyc-core)
- (synopsis "Provider-neutral customer identity and verification (KYC) state")
+ (synopsis
+  "Provider-neutral customer and business verification (KYC, KYB) state")
  (depends
   (ocaml
    (>= 5.2))
