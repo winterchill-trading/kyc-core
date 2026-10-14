@@ -80,22 +80,8 @@ module Chain = struct
 end
 
 module Share = struct
-  module T = struct
-    type t = int [@@deriving compare, equal, hash, sexp_of]
-  end
-
-  include T
-  include Comparable.Make_plain (T)
-
   let whole = 1_000_000_000_000
   let zero = 0
-
-  (* 1 bps = 10^8 parts. Stakes are at most 10^4, so a share times a stake stays below
-     10^16, far inside 63 bits. *)
-  let of_bps bps = bps * 100_000_000
-  let to_bps t = t / 100_000_000
-  let ( + ) = Int.( + )
-  let scale t ~bps = t * bps / 10_000
 
   let to_percent_string t =
     (* 1% = 10^10 parts; keep four decimals. *)
@@ -108,6 +94,23 @@ module Share = struct
       let digits = sprintf "%04d" frac in
       sprintf "%d.%s%%" whole (String.rstrip digits ~drop:(Char.equal '0')))
   ;;
+
+  module T = struct
+    type t = int [@@deriving compare, equal, hash]
+
+    (* Printed as a percentage: the raw parts-per-10^12 count is unreadable. *)
+    let sexp_of_t t = Sexp.Atom (to_percent_string t)
+  end
+
+  include T
+  include Comparable.Make_plain (T)
+
+  (* 1 bps = 10^8 parts. Stakes are at most 10^4, so a share times a stake stays below
+     10^16, far inside 63 bits. *)
+  let of_bps bps = bps * 100_000_000
+  let to_bps t = t / 100_000_000
+  let ( + ) = Int.( + )
+  let scale t ~bps = t * bps / 10_000
 end
 
 let effective (c : Chain.t) =
